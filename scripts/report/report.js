@@ -95,6 +95,24 @@ function cards() {
 }
 cards();
 
+// ---------- what the report is balanced against ----------
+function basis() {
+  const box = $('#basis'), T = D.targets, bits = [];
+  box.append(h('h2', null, 'What it is balanced against'));
+  const c = T.curve, first = S.find((st) => st.target.win != null), last = [...S].reverse().find((st) => st.target.win != null);
+  if (!first) { box.append(h('p', null, 'There is no target file, so the chart shows only what the bots do. Write a target curve first (templates/targets.template.json): without a target nothing can be called too easy or too hard.')); return; }
+  bits.push(`Target curve: the first-try win rate of the ${D.tp} bot should start at ${pct(first.target.win)} on stage ${first.id} and end at ${pct(last.target.win)} on stage ${last.id}${c ? ` (${c.shape || 'linear'} slope${c.bossDrop ? `, bosses ${Math.round(c.bossDrop * 100)} points lower` : ''})` : ''}. A stage counts as on target when it lands within \u00b1${Math.round(D.tol * 100)} points.`);
+  if (T.bosses.length) bits.push(`Boss stages: ${T.bosses.join(', ')} (marked with a triangle under the chart and allowed to be harder than their neighbours).`);
+  if (T.overrides) bits.push(`${T.overrides} stage${T.overrides > 1 ? 's have' : ' has'} their own hand-written target.`);
+  const more = [['timeCurve', 'time'], ['deathsCurve', 'deaths'], ['incomeCurve', 'income']].filter(([k]) => T[k]).map(([, n]) => n);
+  if (more.length) bits.push(`Also checked against targets for ${more.join(', ')} (switch the chart metric to see them).`);
+  if (D.camp) bits.push(`Campaign rule: more than ${Math.round(T.stallMax * 100)}% of players quitting on one stage is a WALL.`);
+  box.append(h('p', null, bits.join(' ')));
+  box.append(h('p', { class: 'hint' }, 'In the chart the dashed line is this target and the green band is its tolerance. The target is a design decision, not a measurement: ', T.file ? `it lives in ${T.file}. ` : '', 'Change that file, run the report again, and the bands and verdicts move with it.'));
+  if (T.note) box.append(h('div', { class: 'fx warn' }, h('b', null, 'Note in the target file: '), T.note));
+}
+basis();
+
 // ---------- look here first ----------
 function worstList() {
   const box = $('#worst');

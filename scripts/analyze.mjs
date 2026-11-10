@@ -264,6 +264,8 @@ if (arg('html')) {
   const dir = path.join(path.dirname(new URL(import.meta.url).pathname), 'report');
   const pick = (x) => x && ({ win: x.win, lo: x.lo, hi: x.hi, n: x.n, tries: x.attempts, stall: x.stall, time: x.time, deaths: x.deaths, income: x.income, bank: x.bank ?? null, power: x.power ?? null, nearMiss: x.nearMiss });
   const data = {
+    targets: { file: arg('targets') || null, note: T._note || null, curve: T.curve || null, timeCurve: T.timeCurve || null, deathsCurve: T.deathsCurve || null, incomeCurve: T.incomeCurve || null,
+      bosses: [...bosses], overrides: Object.keys(T.stages || {}).length, stallMax },
     tp, tol, mtol, camp, personas, logDir, generated: new Date().toISOString().slice(0, 10),
     stages: stageOrder.map((s, i) => ({
       id: s, idx: i, target: targetFor(s, i), flags: flags[s], boss: bosses.has(s),

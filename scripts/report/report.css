@@ -96,3 +96,5 @@ details summary{cursor:pointer;font-weight:600}
   .pb{grid-template-columns:62px 1fr 40px}
   dl{grid-template-columns:1fr}
 }
+
+.basis p{margin:6px 0}
