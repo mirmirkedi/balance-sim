@@ -87,6 +87,13 @@ function oracle(g) {
 
 export default {
   stages: levels.map((l) => String(l.id)),
+  // --- balance-sim studio: how to run it and which knob calibrates a level ---
+  campaign: false,
+  studio: { runs: 30, personas: ['random', 'novice', 'smart'] },
+  levers: {
+    // extra.<id> moves added to ONE level's limit. More moves = easier, so bigger is easier (harder = -1).
+    stage: { param: 'extra.{stage}', mode: 'add', harder: -1, min: -3, max: 10, default: 0, step: 12, integer: true, unit: 'moves' },
+  },
   evaluate, oracle,
   create({ stage, seed, emit, params }) {
     const lv = byId.get(String(stage));

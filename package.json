@@ -8,6 +8,7 @@
   "engines": { "node": ">=18" },
   "scripts": {
     "test": "node --test test/*.test.mjs",
+    "studio": "node scripts/studio.mjs --adapter examples/toy-wave/adapter.mjs --targets examples/toy-wave/targets.json",
     "demo": "node scripts/runner.mjs --adapter examples/toy-wave/adapter.mjs --out /tmp/bs-demo && node scripts/analyze.mjs --logs /tmp/bs-demo --targets examples/toy-wave/targets.json"
   }
 }

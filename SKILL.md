@@ -10,6 +10,15 @@ The game only has to expose a small adapter, so it works for any mechanic.
 
 Scripts: `scripts/` next to this file (installed at `~/.claude/skills/balance-sim/`). Node 18+. Run tests: `npm test`.
 
+## Studio: the web app (start here when the user wants to see and click)
+
+`node ~/.claude/skills/balance-sim/scripts/studio.mjs` in the game folder opens a local web app (needs `tools/balance/adapter.mjs`). Four steps in the UI:
+1. **Detect:** runs the bots on every stage and shows the average difficulty (0-100) and per-stage difficulty, frustration, boredom, skill and confidence scores.
+2. **Target:** template curves (linear, slow start, fast start, S-curve, waves per area, staircase, flat, smooth current, keep current), a fixed average difficulty, tags per stage (harder, easier, boss, breather) and drag-to-pin. Saves `targets.json` with one first-try win rate per stage (1 - difficulty/100).
+3. **Calibrate:** moves the adapter's per-stage `levers.stage` until the measured curve meets the target (`scripts/calibrate.mjs`, fresh seed per round, verified on another seed). Result: before/after, a table of lever changes, "use as active candidate", a prompt for Claude to apply it.
+4. **Runs and logs:** console, attempt log with replay, settings and the full report of every run (state in `<game>/.balance-sim/`).
+The studio never edits game files. Applying calibrated values to the game's data is the agent's job (copy the prompt). Optional adapter exports it reads: `campaign: true`, `studio: { runs, retries, personas }`, `levers: { stage: { param: 'TUNE.stage.adj.{stage}', mode: 'mul' | 'add', harder: 1 | -1, min, max, default, step, integer, unit, read(stageId) } }` (see `examples/pr15-html-vm`, `examples/pr14-puzzle`). Without `levers` Detect and Target still work; tune with the agentic loop below.
+
 ## Cost: run it on Haiku
 
 Running the simulations and reading the report is mechanical, so it should not burn the big model's tokens (the user asked for this).

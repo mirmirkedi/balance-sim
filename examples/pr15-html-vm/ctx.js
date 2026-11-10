@@ -59,6 +59,7 @@
   globalThis.__api = {
     fresh() { S = freshState(); S.mute = true; S.tips = { start: 1, sack: 1, equip: 1, merge: 1, locked: 1, raid: 1 }; S.test = false; return S; },
     use(s) { S = s; },
+    getPath(p) { const a = p.split('.'); let o = a[0] === 'TUNE' ? TUNE : CFG; for (let i = 1; i < a.length; i++) { if (o == null) return undefined; o = o[a[i]]; } return o; },
     setPath(p, v) { const a = p.split('.'); let o = a[0] === 'TUNE' ? TUNE : CFG; for (let i = 1; i < a.length - 1; i++) o = o[a[i]]; o[a[a.length - 1]] = v; },
 
     // one stage attempt, exactly like startMain() but without the screen

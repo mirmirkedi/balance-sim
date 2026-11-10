@@ -12,6 +12,8 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 
 ## What it does
 
+- **Studio (web app).** `node scripts/studio.mjs` in a game folder: detect the difficulty (average and per stage), pick a target curve (templates, average difficulty, stage tags), auto-calibrate the per-stage lever, browse run logs and replay attempts. See SKILL.md.
+
 - **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
 - **Personas** `random`, `novice`, `smart`, `optimizer` (2-move lookahead) and `oracle` (the game's exact solver, for puzzles). The gaps between them show skill depth, mistake cost and weak policies.
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
@@ -26,7 +28,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
-npm test                                   # 17 end-to-end tests
+npm test                                   # 18 end-to-end tests
 ```
 
 Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
@@ -51,6 +53,8 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `SKILL.md` | the skill (workflow, game kinds, personas, adapter contract, log format, verdicts) |
 | `scripts/runner.mjs` | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
 | `scripts/report/` | template, css and js of the interactive HTML report |
+| `scripts/studio.mjs`, `scripts/studio/` | the web app: local server + single page app (detect, target, calibrate, logs) |
+| `scripts/calibrate.mjs` | moves per-stage levers until the measured curve meets the target (used by the studio, also a CLI) |
 | `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |
 | `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |

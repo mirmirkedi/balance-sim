@@ -89,6 +89,14 @@ let appliedParams = '';
 export default {
   stages: Array.from({ length: 40 }, (_, i) => i + 1),
 
+  // --- balance-sim studio: how to run it and which knob calibrates a stage ---
+  campaign: true,                                   // one player lives through all stages (backpack, gear carry over)
+  studio: { retries: 10, runs: 100, personas: ['random', 'novice', 'smart'] },
+  levers: {
+    // TUNE.stage.adj[stage] multiplies enemy HP and damage of ONE stage (1 = formula value). Bigger = harder.
+    stage: { param: 'TUNE.stage.adj.{stage}', mode: 'mul', harder: 1, min: 0.5, max: 4, default: 1, unit: 'x', read: (s) => api.getPath('TUNE.stage.adj.' + s) ?? 1 },
+  },
+
   newProfile() { return { S: api.fresh() }; },
 
   create({ stage, seed, emit, params, profile }) {

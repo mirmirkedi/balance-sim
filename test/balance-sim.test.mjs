@@ -182,3 +182,34 @@ test('BOT_LOST replaces NO_SKILL when both bots almost never win', () => {
   const fl = JSON.parse(fs.readFileSync(rep, 'utf8')).stages['1'].flags;
   assert.ok(fl.includes('BOT_LOST') && !fl.includes('NO_SKILL'));
 });
+
+test('studio: serves the app, saves a target, runs a detection job and exposes the logs', async () => {
+  const { spawn } = await import('node:child_process');
+  const proj = path.join(tmp, 'studio-proj');
+  fs.mkdirSync(proj, { recursive: true });
+  const port = 4300 + Math.floor(Math.random() * 500);
+  const child = spawn(process.execPath, [path.join(root, 'scripts', 'studio.mjs'), '--no-open', '--port', String(port), '--dir', proj, '--adapter', adapter('toy-wave'), '--targets', path.join(proj, 'targets.json')], { stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('studio did not start')), 15000); child.stdout.on('data', (d) => { if (String(d).includes('127.0.0.1')) { clearTimeout(t); res(); } }); child.on('exit', () => rej(new Error('studio exited'))); });
+    const base = `http://127.0.0.1:${port}`;
+    const get = async (p) => (await fetch(base + p)).json();
+    const post = async (p, body) => (await fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+    assert.ok((await (await fetch(base + '/')).text()).includes('Balance Studio'));
+    const st = await get('/api/state');
+    assert.ok(st.info.stages.length > 3 && !st.infoError && st.info.levers === null);
+    await post('/api/targets', { targets: { targetPersona: 'smart', tolerance: 0.15, stages: { 1: { firstTryWin: 0.9 } } } });
+    const job = await post('/api/jobs', { kind: 'detect', personas: ['random', 'smart'], runs: 8, retries: 0, seed: 1, stages: '1-3' });
+    assert.ok(job.id);
+    for (let i = 0; i < 60; i++) { const s = await get('/api/state'); if (!s.job || s.job.status !== 'running') break; await new Promise((r) => setTimeout(r, 500)); }
+    const run = await get('/api/runs/' + job.id);
+    assert.equal(run.meta.status, 'done');
+    assert.ok(run.report.stages['1'].smart && run.meta.summary.avgDifficulty != null);
+    const att = await get(`/api/runs/${job.id}/attempts?persona=smart&limit=5`);
+    assert.ok(att.length > 0 && att[0].persona === 'smart');
+    assert.ok((await (await fetch(`${base}/run/${job.id}/report.html`)).text()).includes('Balance report'));
+    const noLever = await post('/api/jobs', { kind: 'calibrate' });
+    for (let i = 0; i < 40; i++) { const s = await get('/api/state'); if (!s.job || s.job.status !== 'running') break; await new Promise((r) => setTimeout(r, 300)); }
+    const c = await get('/api/runs/' + noLever.id);
+    assert.equal(c.meta.status, 'failed');   // toy adapter has no levers: the calibrator says so instead of guessing
+  } finally { child.kill(); }
+});
