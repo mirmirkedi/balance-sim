@@ -70,7 +70,7 @@ if (!replay && !has('no-check')) {
   const once = () => {
     const profile = campaign && adapter.newProfile ? adapter.newProfile({ seed: seedC, params, startStage: st }) : null;
     const pr = playRun({ adapter, persona: 'smart', stage: st, seed: seedC, params, opts, sink() {}, profile, maxSteps });
-    return JSON.stringify([pr.res, pr.steps]);
+    return JSON.stringify([pr.res, pr.steps, pr.error]);
   };
   try { if (once() !== once()) console.error('WARNING: NONDETERMINISTIC. The same seed gave two different runs of stage ' + st + '. Route every random call of the game through the seeded rng (see SKILL.md, "Determinism"). Results and --replay are unreliable until fixed.'); }
   catch (e) { /* adapters that need a campaign profile are checked only in --campaign mode */ }
