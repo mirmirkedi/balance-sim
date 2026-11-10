@@ -53,10 +53,10 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |
 | `scripts/personas.mjs`, `lib.mjs`, `rng.mjs` | personas (+ `chooseItem` for shops), shared run loop, seeded RNG |
 | `templates/` | adapter and target-curve templates |
-| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign) |
+| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr15-html-vm` (a real single-HTML game run headless in a Node vm; set `PR15_GAME=/path/to/game.html`) |
 | `commands/balance.md` | the `/balance` slash command |
 | `test/` | end-to-end tests (`npm test`) |
 
 ## Status
 
-Tested on three toy mechanics, not yet on a real game. Bots are not humans: real playtests override the report.
+Tested on three toy mechanics and one real game (PR-15, headless via `vm`). Bots are not humans: real playtests override the report. The HTML report's chart has not been checked in a browser yet (structure only).
