@@ -39,6 +39,9 @@ const ctx = vm.createContext({
   ResizeObserver: class { observe() {} },
 });
 ctx.window = ctx; ctx.self = ctx;
+// The game calls Math.random() directly in 17 places (crit, dodge, drops, shuffles). Without this the runs are not
+// reproducible and --replay / tuning comparisons are noise. Route every random call through the seeded host.rnd.
+vm.runInContext('Math.random = function () { return __host.rnd(); }', ctx);
 
 const html = fs.readFileSync(GAME, 'utf8');
 const m = html.match(/<script>([\s\S]*)<\/script>/);

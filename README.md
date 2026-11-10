@@ -26,7 +26,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
-npm test                                   # 13 end-to-end tests
+npm test                                   # 14 end-to-end tests
 ```
 
 Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
@@ -61,4 +61,4 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 
 ## Status
 
-Tested on three toy mechanics and one real game (PR-15, headless via `vm`). Bots are not humans: real playtests override the report. The HTML report's chart has not been checked in a browser yet (structure only).
+Tested on three toy mechanics and one real game (PR-15, headless via `vm`; tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md). Bots are not humans: real playtests override the report. The HTML report's chart has not been checked in a browser yet (structure only).

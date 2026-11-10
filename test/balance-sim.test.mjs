@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -137,4 +137,11 @@ test('tune evaluates candidates, adds a baseline, keeps history and shows detail
   assert.match(scout, /s4/);
   const det = run('tune.mjs', ['--state', st, '--adapter', adapter('toy-wave'), '--detail', 'easy']);
   assert.match(det, /stage\s+win\s+target/);
+});
+
+test('runner warns when a game is not deterministic for the same seed', () => {
+  const bad = path.join(tmp, 'bad-adapter.mjs');
+  fs.writeFileSync(bad, `export default { stages: [1], create() { let n = 0; return { legalActions: () => [{ type: 'a' }], step() { n += Math.random() < 0.5 ? 1 : 2; }, isDone: () => n >= 5, result: () => ({ win: true, time: n }) }; } };`);
+  const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'runner.mjs'), '--adapter', bad, '--runs', '3', '--personas', 'smart', '--out', path.join(tmp, 'bad-logs')], { encoding: 'utf8' });
+  assert.match(r.stderr, /NONDETERMINISTIC/);
 });

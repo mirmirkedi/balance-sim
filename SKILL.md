@@ -150,6 +150,14 @@ Also: cliff shape (all 100% then 0%: the ramp is a staircase), `tries` (>3 on a 
 - Buff weak options instead of nerfing strong ones. Add pity to random drops. Every faucet needs a sink.
 - Real playtest or telemetry overrides the bot. Say so in every report.
 
+## Lessons from tuning PR-15 (read before a real game)
+
+- **Determinism first.** A game that calls `Math.random()` directly makes every comparison noise. Override it inside the vm (`Math.random = () => host.rnd()`). `runner.mjs` now warns `NONDETERMINISTIC` when the same seed gives two runs.
+- **Use `--retries 10` while tuning a campaign.** With 2 retries players quit at the first wall, later stages get almost no samples and are biased towards lucky or strong players. Tune with generous retries, then check the real funnel with `--retries 2` and tell the user how many players quit where.
+- **Smooth curves cannot fix a sawtooth.** If boss or odd stages stay off while the global curve fits, add a per-stage multiplier table to the game's data (PR-15: `TUNE.stage.adj`, applied to enemy HP and damage) and correct it by damped fixed-point iteration: `adj *= exp(0.7 * (win - target))` for stages more than 10 points off, 6-9 rounds, a new `--seed` each round. Damage alone saturated (the hero kills first), so scale HP too.
+- **Shell quoting.** In zsh an unquoted `$SETS` is not split into words, so `--set` flags silently vanish and you measure the defaults. Use arrays, `${=SETS}`, or call `tune.mjs` (it passes arguments as an array).
+- **Evaluate on a new seed** before declaring a candidate good; the tuner's own seed is overfitted. PR-15 went from 22 to 9 points mean error against the target on a fresh seed.
+
 ## Known limits
 
 - A bot is as good as its `policy`/`evaluate`. If `smart` is weak the curve is too pessimistic; a perfect solver makes it too optimistic. Calibrate with `--humans`, spot-check with `--replay`.

@@ -1,4 +1,11 @@
 logs/
 *.jsonl
+*.log
+tune-state/
+*.tmp
 node_modules/
 .DS_Store
+.idea/
+.vscode/
+.env
+*.html.bak

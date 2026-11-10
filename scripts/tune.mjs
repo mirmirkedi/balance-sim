@@ -29,7 +29,9 @@ fs.mkdirSync(state, { recursive: true });
 const histFile = path.join(state, 'history.jsonl');
 const readHist = () => fs.existsSync(histFile) ? fs.readFileSync(histFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 const pc = (x) => x == null ? '   - ' : String(Math.round(x * 100)).padStart(4) + '%';
-const fmtParams = (p) => Object.entries(p).map(([k, v]) => `${k}=${v}`).join(' ') || '(defaults)';
+let shortPrefix = '';   // keys of one batch usually share a long prefix (TUNE.stage.dmgAnch.): print it once
+const fmtParams = (p) => Object.entries(p).map(([k, v]) => `${shortPrefix && k.startsWith(shortPrefix) ? k.slice(shortPrefix.length) : k}=${v}`).join(' ') || '(defaults)';
+const commonPrefix = (keys) => { if (keys.length < 2) return ''; let a = keys[0]; for (const k of keys) while (!k.startsWith(a)) a = a.slice(0, -1); return a.slice(0, a.lastIndexOf('.') + 1); };
 
 if (has('history')) {
   const h = readHist().sort((a, b) => a.loss - b.loss).slice(0, +arg('top', 10));
@@ -100,6 +102,7 @@ const hist = readHist();
 if (!hist.length && !cands.some((c) => !Object.keys(c.params).length) && cands.length) cands.unshift({ name: 'base', params: {} });   // always have a baseline
 
 const results = [];
+shortPrefix = commonPrefix([...new Set(cands.flatMap((c) => Object.keys({ ...baseParams, ...c.params })))]);
 for (const c of cands) {
   const r = evaluate(c);
   const entry = { id: readHist().length + 1, name: c.name, ...r, persona, runs: +runs, at: new Date().toISOString() };
@@ -109,6 +112,7 @@ for (const c of cands) {
 
 if (results.length) {
   const base = readHist().find((e) => e.name === 'base');
+  if (shortPrefix) console.log(`(param keys shortened: ${shortPrefix}...)`);
   console.log(`\ntune: ${results.length} candidates, persona=${persona}, runs=${runs}${base ? `, baseline loss ${Math.round(base.loss * 100)} pts` : ''}\n`);
   console.log('id  name'.padEnd(14), 'loss'.padStart(7), 'flagged'.padStart(8), '  params');
   for (const e of [...results].sort((a, b) => a.loss - b.loss)) console.log(`${String(e.id).padEnd(3)} ${e.name}`.padEnd(14), (Number.isNaN(e.loss) ? 'n/a' : Math.round(e.loss * 100) + ' pts').padStart(7), String(e.flagged).padStart(8), ' ', fmtParams(e.params));

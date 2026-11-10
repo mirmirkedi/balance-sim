@@ -64,6 +64,18 @@ const flush = (persona, stage, lines) => {
   else fs.appendFileSync(path.join(outDir, persona + '.jsonl'), lines.join('\n') + '\n');
 };
 
+// Guard: the same seed must give the same run. A game that calls Math.random() directly makes every comparison noise.
+if (!replay && !has('no-check')) {
+  const st = stages[0], seedC = seedFor(seed0, all.indexOf(st), 0, 1);
+  const once = () => {
+    const profile = campaign && adapter.newProfile ? adapter.newProfile({ seed: seedC, params, startStage: st }) : null;
+    const pr = playRun({ adapter, persona: 'smart', stage: st, seed: seedC, params, opts, sink() {}, profile, maxSteps });
+    return JSON.stringify([pr.res, pr.steps]);
+  };
+  try { if (once() !== once()) console.error('WARNING: NONDETERMINISTIC. The same seed gave two different runs of stage ' + st + '. Route every random call of the game through the seeded rng (see SKILL.md, "Determinism"). Results and --replay are unreliable until fixed.'); }
+  catch (e) { /* adapters that need a campaign profile are checked only in --campaign mode */ }
+}
+
 const t0 = Date.now();
 let total = 0;
 const runIdxs = (n) => replay ? [replay.run] : Array.from({ length: n }, (_, i) => i);
