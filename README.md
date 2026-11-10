@@ -1,19 +1,31 @@
 # balance-sim
 
 Game-independent balance simulator, packaged as a Claude Code skill.
-Bots play every level thousands of times, every shot / kill / drop / purchase is logged, and the analyzer prints the difficulty curve against a target curve with a verdict per stage.
+Bots play every level thousands of times, every shot / kill / drop / purchase is logged, and the analyzer prints the difficulty curve against a target curve (win rate with 95% CI, time, deaths, income) with a verdict per stage.
 
 ```
-stage   random novice  smart optimi  target  delta  tries   time  death  income   flags
-8          80%    99%   100%   100%     60%    +40    1.0     49   0.00      62   TOO_EASY RANDOM_WINS
-9           1%    22%    29%    48%     55%    -26    3.4     55   0.71      74   TOO_HARD SPIKE
+stage   random novice  smart optimi  target  delta   95% CI  tries   time  death  income   flags
+4         100%   100%   100%   100%     83%    +17   96-100    1.0      8   0.00      26   ?EASY FAST RANDOM_WINS
+5          11%    32%    43%    43%     59%    -16    34-53    1.6     33   0.57      30   ?HARD COINFLIP
+10          0%     0%     0%     0%     40%    -40      0-4    3.0     49   3.00       0   TOO_HARD WALL NO_SKILL
 ```
+
+## What it does
+
+- **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
+- **Personas** `random`, `novice`, `smart`, `optimizer`. The gaps between them show skill depth, mistake cost and weak policies.
+- **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
+- **Sweep** one parameter over several values and pick the best (`sweep.mjs`).
+- **Replay** any single run as a timeline (`--replay smart:7:12`).
+- **Calibrate** bots against real playtest numbers (`--humans`).
+- **HTML report** with curve, target band and flagged stages (`--html`).
 
 ## Install
 
 ```bash
-git clone <this repo> ~/code/balance-sim
+git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
+npm test                                   # 12 end-to-end tests
 ```
 
 Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
@@ -22,23 +34,29 @@ Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whe
 
 ```bash
 node scripts/runner.mjs  --adapter examples/toy-wave/adapter.mjs --runs 100 --out logs/base
-node scripts/analyze.mjs --logs logs/base --targets examples/toy-wave/targets.json --details --stage 9
+node scripts/analyze.mjs --logs logs/base --targets examples/toy-wave/targets.json --html logs/base.html
+node scripts/sweep.mjs   --adapter examples/toy-budget/adapter.mjs --targets examples/toy-budget/targets.json \
+                         --param budget --values 0.8,0.9,1 --runs 40
+node scripts/runner.mjs  --adapter examples/toy-autobattle/adapter.mjs --campaign --runs 100 --out logs/camp
+node scripts/runner.mjs  --adapter examples/toy-wave/adapter.mjs --replay smart:7:12
 ```
 
-Write an adapter for your own game from `templates/adapter.template.mjs`. Full workflow, log format and verdict table: [SKILL.md](SKILL.md).
+Write an adapter for your own game from `templates/adapter.template.mjs`. Workflow, adapter contract, log format and the verdict table: [SKILL.md](SKILL.md).
 
 ## Layout
 
 | path | what |
 |---|---|
-| `SKILL.md` | the skill (workflow, personas, log format, verdicts) |
-| `scripts/runner.mjs` | plays stages with personas, writes JSONL logs |
-| `scripts/analyze.mjs` | curve, verdicts, details, economy, `--compare` |
-| `scripts/personas.mjs` | random / novice / smart / optimizer |
+| `SKILL.md` | the skill (workflow, game kinds, personas, adapter contract, log format, verdicts) |
+| `scripts/runner.mjs` | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
+| `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
+| `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |
+| `scripts/personas.mjs`, `lib.mjs`, `rng.mjs` | personas (+ `chooseItem` for shops), shared run loop, seeded RNG |
 | `templates/` | adapter and target-curve templates |
-| `examples/toy-wave/` | finished adapter, doubles as smoke test |
+| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign) |
 | `commands/balance.md` | the `/balance` slash command |
+| `test/` | end-to-end tests (`npm test`) |
 
 ## Status
 
-Works on the toy example only. Not yet tried on a real game. Known gaps are tracked in the issues.
+Tested on three toy mechanics, not yet on a real game. Bots are not humans: real playtests override the report.

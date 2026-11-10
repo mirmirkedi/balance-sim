@@ -12,10 +12,12 @@ function rollAt(seed, n) {
 
 class Toy {
   constructor(stage, emit, s) { this.stage = stage; this.emit = emit; this.s = s; }
-  static init(stage, seed) {
+  // P = tunables handed in by `--set key=value` (multipliers, default 1): enemyHp, enemyAtk, playerDmg
+  static init(stage, seed, P = {}) {
     const hpMax = 100 + 10 * (stage - 1);
     const s = {
-      seed, rolls: 0, hp: hpMax, hpMax, dmg: Math.round(12 * (1 + 0.12 * (stage - 1))), potions: 2,
+      seed, rolls: 0, hp: hpMax, hpMax, dmg: Math.round(12 * (1 + 0.12 * (stage - 1)) * (P.playerDmg ?? 1)), potions: 2,
+      eHp: P.enemyHp ?? 1, eAtk: P.enemyAtk ?? 1,
       wave: 0, waves: 2 + Math.floor(stage / 4), enemies: [], t: 0, coins: 0, done: false, win: false,
     };
     const g = new Toy(stage, NOOP, s);
@@ -25,7 +27,7 @@ class Toy {
   roll() { return rollAt(this.s.seed, this.s.rolls++); }
   spawn() {
     const { stage } = this, s = this.s;
-    const hp = Math.round(20 * (1 + 0.12 * (stage - 1))), atk = 2.2 * (1 + 0.1 * (stage - 1));
+    const hp = Math.round(20 * (1 + 0.12 * (stage - 1)) * s.eHp), atk = 2.2 * (1 + 0.1 * (stage - 1)) * s.eAtk;
     const count = 2 + Math.floor(stage / 3);
     s.enemies = Array.from({ length: count }, () => ({ kind: 'grunt', hp, max: hp, atk, hits: 0 }));
     if (stage % 5 === 0 && s.wave === s.waves - 1) s.enemies.push({ kind: 'boss', hp: hp * 3, max: hp * 3, atk: atk * 2, hits: 0 });
@@ -69,7 +71,8 @@ class Toy {
     if (s.hp <= 0) { s.done = true; s.win = false; }
     else if (!s.enemies.length) { s.wave++; if (s.wave >= s.waves) { s.done = true; s.win = true; } else this.spawn(); }
   }
-  clone() { return new Toy(this.stage, NOOP, JSON.parse(JSON.stringify(this.s))); }
+  // clone() for lookahead must NOT share the RNG stream, or the optimizer "sees" future crits and drops.
+  clone() { const s = JSON.parse(JSON.stringify(this.s)); s.seed = (s.seed ^ 0x5bd1e995) >>> 0; return new Toy(this.stage, NOOP, s); }
   result() {
     const s = this.s;
     return { win: s.win, hpLeft: Math.max(0, s.hp), hpMax: s.hpMax, time: s.t, deaths: s.win ? 0 : 1, income: s.coins, resources: { coins: s.coins, potions: s.potions } };
@@ -78,7 +81,7 @@ class Toy {
 
 export default {
   stages: Array.from({ length: 10 }, (_, i) => i + 1),
-  create({ stage, seed, emit }) { const g = Toy.init(stage, seed); g.emit = emit; return g; },
+  create({ stage, seed, emit, params }) { const g = Toy.init(stage, seed, params); g.emit = emit; return g; },
   // sensible human play: drink at low hp, otherwise kill the most dangerous enemy that dies fastest
   policy(game, acts) {
     const s = game.observe();

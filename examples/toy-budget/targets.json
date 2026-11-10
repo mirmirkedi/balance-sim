@@ -1,0 +1,6 @@
+{
+  "targetPersona": "smart",
+  "tolerance": 0.15,
+  "curve": { "start": 0.9, "end": 0.55, "shape": "linear", "bossDrop": 0.15 },
+  "bosses": ["5", "10"]
+}

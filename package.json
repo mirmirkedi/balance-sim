@@ -1,0 +1,13 @@
+{
+  "name": "balance-sim",
+  "version": "0.2.0",
+  "description": "Game-independent balance simulator (Claude Code skill): bot personas, difficulty curve, economy, campaign mode",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "demo": "node scripts/runner.mjs --adapter examples/toy-wave/adapter.mjs --out /tmp/bs-demo && node scripts/analyze.mjs --logs /tmp/bs-demo --targets examples/toy-wave/targets.json"
+  }
+}

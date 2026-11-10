@@ -28,8 +28,11 @@ function smart(game, rng, adapter) {
 }
 
 // depth-limited search on clones; value = adapter.evaluate(state), higher is better
-function lookahead(game, acts, rng, adapter, depth) {
+// With many actions (>beam) the first level is pruned to the `beam` best 1-ply moves before searching deeper.
+function lookahead(game, acts, rng, adapter, depth, beam = 6) {
   let best = [], bv = -Infinity;
+  if (depth > 1 && acts.length > beam)
+    acts = acts.map((a) => [a, valueAfter(game, a, adapter, 1)]).sort((x, y) => y[1] - x[1]).slice(0, beam).map((x) => x[0]);
   for (const a of acts) {
     const v = valueAfter(game, a, adapter, depth);
     if (v > bv + 1e-9) { bv = v; best = [a]; } else if (Math.abs(v - bv) <= 1e-9) best.push(a);
@@ -65,3 +68,14 @@ export const PERSONAS = {
     return smart(game, rng, adapter);
   },
 };
+
+// Helper for shop / upgrade / build-order decisions (campaign mode, adapter.shop()).
+// Same skill ladder as the in-fight personas, so spending quality differs per persona too:
+//   random -> any item, novice -> best item but errs, smart/optimizer -> highest score(item).
+export function chooseItem(items, score, persona, rng, opts = {}) {
+  if (!items.length) return null;
+  const any = () => items[Math.floor(rng() * items.length)];
+  if (persona === 'random') return any();
+  if (persona === 'novice' && rng() < (opts.noviceError ?? 0.25)) return any();
+  return items.reduce((best, it) => (score(it) > score(best) ? it : best));
+}

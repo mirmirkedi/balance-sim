@@ -1,12 +1,18 @@
 {
-  "_help": "Target curve. Write it BEFORE tuning. Win rates are FIRST-TRY win rates of targetPersona (smart = average player).",
+  "_help": "Target curve. Write it BEFORE tuning. Win rates are FIRST-TRY win rates of targetPersona (smart = the average player). time is seconds, deaths = failed attempts per stage, income = soft currency earned per cleared stage.",
   "targetPersona": "smart",
   "tolerance": 0.12,
+  "metricTolerance": 0.3,
   "curve": { "start": 0.95, "end": 0.45, "shape": "linear", "bossDrop": 0.15 },
+  "timeCurve": { "start": 40, "end": 120, "bossMul": 1.5 },
+  "deathsCurve": { "start": 0.05, "end": 0.6 },
+  "incomeCurve": { "start": 20, "end": 120 },
   "bosses": [],
   "spikeThreshold": 0.2,
   "skillGapMin": 0.15,
   "randomWinMax": 0.25,
+  "policyGapMax": 0.2,
+  "stallMax": 0.1,
   "stages": {
     "_example": { "firstTryWin": 0.9, "timeSec": 60, "deaths": 0.1, "income": 100 }
   }

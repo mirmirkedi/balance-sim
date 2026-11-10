@@ -1,0 +1,9 @@
+{
+  "targetPersona": "smart",
+  "tolerance": 0.15,
+  "curve": { "start": 0.95, "end": 0.6, "shape": "linear", "bossDrop": 0.2 },
+  "bosses": ["5", "10", "15", "20"],
+  "stallMax": 0.1,
+  "timeCurve": { "start": 15, "end": 60 },
+  "incomeCurve": { "start": 14, "end": 90 }
+}
