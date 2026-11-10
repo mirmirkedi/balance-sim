@@ -157,7 +157,7 @@ test('tune evaluates candidates, adds a baseline, keeps history and shows detail
 
 test('runner warns when a game is not deterministic for the same seed', () => {
   const bad = path.join(tmp, 'bad-adapter.mjs');
-  fs.writeFileSync(bad, `export default { stages: [1], policy: (g) => g.legalActions()[0], create() { let n = 0; return { legalActions: () => [{ type: 'a' }], step() { n += Math.random() < 0.5 ? 1 : 2; }, isDone: () => n >= 200, result: () => ({ win: true, time: n }) }; } };`);
+  fs.writeFileSync(bad, `export default { stages: [1], policy: (g) => g.legalActions()[0], create() { let n = 0; return { legalActions: () => [{ type: 'a' }], step() { n += Math.random() < 0.5 ? 1 : 2; }, isDone: () => n >= 200, result: () => ({ win: true, time: n + Math.random() }) }; } };`);   // random time: two runs never match by luck
   const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'runner.mjs'), '--adapter', bad, '--runs', '3', '--personas', 'smart', '--out', path.join(tmp, 'bad-logs')], { encoding: 'utf8' });
   assert.match(r.stderr, /NONDETERMINISTIC/);
 });
