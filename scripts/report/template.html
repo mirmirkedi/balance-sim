@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Balance report</title>
+<style>/*CSS*/</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Balance report</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <button id="theme" class="ghost" type="button" aria-label="Switch colour theme">Theme</button>
+  </header>
+
+  <section id="cards" class="cards" aria-label="Summary"></section>
+
+  <section>
+    <h2>Look here first</h2>
+    <div id="worst" class="chips"></div>
+  </section>
+
+  <section>
+    <div class="bar">
+      <h2>Curve</h2>
+      <div id="metrics" class="seg" role="tablist" aria-label="Metric"></div>
+    </div>
+    <div id="personas" class="chips"></div>
+    <div id="chartwrap" class="chartwrap">
+      <svg id="chart" role="img" aria-label="Chart of the selected metric per stage and persona"></svg>
+      <div id="tip" class="tip" hidden></div>
+    </div>
+    <p class="hint">Hover a stage to compare personas, click it (or press the arrow keys) to explain it. The green band is the target plus or minus the tolerance. Red rings are flagged stages.</p>
+  </section>
+
+  <section id="detail" class="detail" aria-live="polite"></section>
+
+  <section>
+    <div class="bar">
+      <h2>All stages</h2>
+      <div id="filters" class="seg"></div>
+    </div>
+    <div class="tablewrap"><table id="table"></table></div>
+    <div class="row">
+      <button id="copy" class="ghost" type="button">Copy flagged stages as text</button>
+      <span id="copied" class="hint"></span>
+    </div>
+  </section>
+
+  <section>
+    <details>
+      <summary>What do the flags mean?</summary>
+      <dl id="glossary"></dl>
+    </details>
+  </section>
+
+  <footer>Bots are not humans. A real playtest or telemetry always overrides this report.</footer>
+</main>
+<script id="d" type="application/json">"__DATA__"</script>
+<script>/*JS*/</script>
+</body>
+</html>

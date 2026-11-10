@@ -91,7 +91,23 @@ test('human calibration and html report', () => {
   const out = run('analyze.mjs', ['--logs', dir, '--targets', targets('toy-wave'), '--humans', hf, '--html', html]);
   assert.match(out, /closest to real players/);
   const h = fs.readFileSync(html, 'utf8');
-  assert.ok(h.includes('<svg') && h.includes('prefers-color-scheme'));
+  // the page is self-contained: data is embedded JSON, the chart is drawn by the embedded script in the browser
+  assert.ok(h.includes('<svg') && h.includes('prefers-color-scheme') && !h.includes('"__DATA__"') && !h.includes('/*JS*/'));
+  const m = /<script id="d" type="application\/json">([\s\S]*?)<\/script>/.exec(h);
+  const data = JSON.parse(m[1]);
+  assert.equal(data.tp, 'smart');
+  assert.ok(data.stages.length > 3 && data.stages[0].p.smart && Array.isArray(data.stages[0].flags));
+  assert.ok(!/https?:\/\//.test(h.replace(/https?:\/\/www\.w3\.org[^"']*/g, '')), 'no network resources');
+});
+
+test('RANDOM_WINS is not raised on tutorial stages whose target is above 80%', () => {
+  const dir = path.join(tmp, 'rw'), t = path.join(tmp, 'rw-targets.json');
+  fs.writeFileSync(t, JSON.stringify({ targetPersona: 'smart', tolerance: 0.15, curve: { start: 0.95, end: 0.95, shape: 'linear' } }));
+  run('runner.mjs', ['--adapter', adapter('toy-wave'), '--runs', '30', '--stages', '1-2', '--personas', 'random,smart', '--out', dir]);
+  const rep = path.join(tmp, 'rw.json');
+  run('analyze.mjs', ['--logs', dir, '--targets', t, '--out', rep]);
+  const r = JSON.parse(fs.readFileSync(rep, 'utf8'));
+  for (const st of Object.values(r.stages)) assert.ok(!st.flags.includes('RANDOM_WINS'));
 });
 
 test('lookahead clones do not share the random stream (no peeking at the future)', async () => {

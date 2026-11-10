@@ -132,7 +132,8 @@ stageOrder.forEach((s, i) => {
     if (difficulty[i] - prev > spikeT) f.push('SPIKE'); else if (prev - difficulty[i] > spikeT) f.push('DIP');
   }
   const rnd = st.random, smart = st.smart || st[tp];
-  if (rnd && rnd.win > randomWinMax) f.push('RANDOM_WINS');
+  // random winning is only a problem where the stage is meant to challenge (target <= 80%); tutorial stages are allowed to be trivial
+  if (rnd && rnd.win > randomWinMax && (tg.win == null || tg.win <= 0.8)) f.push('RANDOM_WINS');
   if (rnd && smart && smart.win - rnd.win < skillGapMin && smart.win < 0.95) f.push('NO_SKILL');
   if (st.optimizer && st.smart && st.optimizer.win - st.smart.win > policyGapMax) f.push('POLICY_GAP');
   if (me.win > 0.15 && me.win < 0.85 && me.n >= 20 && me.nearMiss > 0.5) f.push('COINFLIP');
@@ -257,28 +258,19 @@ if (arg('compare') && fs.existsSync(arg('compare'))) {
   }
 }
 if (arg('html')) {
-  const W = 720, H2 = 300, L = 44, R = 16, TP = 16, B = 34, pw = W - L - R, ph = H2 - TP - B;
-  const X = (i) => L + (n > 1 ? pw * i / (n - 1) : pw / 2), Y = (v) => TP + ph * (1 - v);
-  const cols = { random: 'var(--c-random)', novice: 'var(--c-novice)', smart: 'var(--c-smart)', optimizer: 'var(--c-opt)' };
-  const line = (get, extra = '') => { const pts = stageOrder.map((s, i) => get(s, i) == null ? null : `${X(i).toFixed(1)},${Y(get(s, i)).toFixed(1)}`).filter(Boolean); return pts.length ? `<polyline points="${pts.join(' ')}" fill="none" ${extra}/>` : ''; };
-  const band = stageOrder.some((s, i) => targetFor(s, i).win != null)
-    ? `<polygon fill="var(--band)" points="${stageOrder.map((s, i) => `${X(i).toFixed(1)},${Y(Math.min(1, (targetFor(s, i).win ?? 0) + tol)).toFixed(1)}`).join(' ')} ${[...stageOrder].map((s, i) => [s, i]).reverse().map(([s, i]) => `${X(i).toFixed(1)},${Y(Math.max(0, (targetFor(s, i).win ?? 0) - tol)).toFixed(1)}`).join(' ')}"/>` : '';
-  const grid = [0, 0.25, 0.5, 0.75, 1].map((v) => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" class="ax">${v * 100}%</text>`).join('');
-  const xl = stageOrder.map((s, i) => (n <= 24 || i % Math.ceil(n / 24) === 0) ? `<text x="${X(i)}" y="${H2 - 12}" text-anchor="middle" class="ax">${s}</text>` : '').join('');
-  const marks = stageOrder.map((s, i) => flags[s].some((f) => f !== 'LOW_N' && !f.startsWith('?')) && S[s][tp] ? `<circle cx="${X(i)}" cy="${Y(S[s][tp].win)}" r="5" fill="none" stroke="var(--bad)" stroke-width="2"/>` : '').join('');
-  const lines = personas.map((p) => line((s) => S[s][p]?.win, `stroke="${cols[p] || 'var(--c-smart)'}" stroke-width="${p === tp ? 3 : 1.6}"`)).join('')
-    + line((s, i) => targetFor(s, i).win, 'stroke="var(--fg)" stroke-width="1.5" stroke-dasharray="5 4"');
-  const legend = personas.map((p) => `<span><i style="background:${cols[p] || 'var(--c-smart)'}"></i>${p}${p === tp ? ' (target persona)' : ''}</span>`).join('') + '<span><i class="dash"></i>target</span><span><i class="ring"></i>flagged stage</span>';
-  const trs = stageOrder.map((s, i) => { const me = S[s][tp], tg = targetFor(s, i); return `<tr><td>${s}</td>${personas.map((p) => `<td>${S[s][p] ? Math.round(S[s][p].win * 100) + '%' : '-'}</td>`).join('')}<td>${tg.win != null ? Math.round(tg.win * 100) + '%' : '-'}</td><td>${me ? Math.round(me.lo * 100) + '-' + Math.round(me.hi * 100) : '-'}</td><td>${num(me?.attempts, 1)}</td><td>${num(me?.time)}</td><td>${num(me?.income)}</td><td class="fl">${flags[s].join(' ')}</td></tr>`; }).join('');
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Balance report</title><style>
-:root{--bg:#fafaf7;--fg:#1d1d1b;--mut:#6b6b66;--grid:#e3e3dc;--band:rgba(80,160,110,.16);--bad:#c0392b;--c-random:#9a9a94;--c-novice:#d98b2b;--c-smart:#2b6fd9;--c-opt:#7a4fd0}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#171716;--fg:#ececE6;--mut:#9a9a92;--grid:#2c2c29;--band:rgba(90,190,130,.18);--bad:#ff6b5b;--c-random:#8d8d86;--c-novice:#f0a64a;--c-smart:#6ea2ff;--c-opt:#b190ff}}
-body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif}main{max-width:760px;margin:auto}h1{font-size:20px;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 16px}
-svg{width:100%;height:auto}.ax{font-size:11px;fill:var(--mut)}.lg{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--mut);margin:8px 0 20px}.lg i{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle}.lg i.dash{background:repeating-linear-gradient(90deg,var(--fg) 0 5px,transparent 5px 9px)}.lg i.ring{width:9px;height:9px;border:2px solid var(--bad);border-radius:50%;background:none}
-.t{overflow-x:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}th{color:var(--mut);font-weight:600}td:first-child,th:first-child,td.fl{text-align:left}td.fl{color:var(--bad)}
-</style></head><body><main><h1>Balance report</h1><p class="s">First-try win rate per stage. Shaded band = target ± ${Math.round(tol * 100)}%. Target persona: ${tp}. Bots are not humans: real playtests override this.</p>
-<svg viewBox="0 0 ${W} ${H2}" role="img" aria-label="Win rate per stage for each persona against the target band">${grid}${band}${lines}${marks}${xl}</svg><div class="lg">${legend}</div>
-<div class="t"><table><thead><tr><th>stage</th>${personas.map((p) => `<th>${p}</th>`).join('')}<th>target</th><th>95% CI</th><th>tries</th><th>time</th><th>income</th><th>flags</th></tr></thead><tbody>${trs}</tbody></table></div></main></body></html>`;
-  fs.writeFileSync(arg('html'), html);
+  // the page is one self-contained file: data as JSON + css + js from scripts/report/ (no network needed)
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), 'report');
+  const pick = (x) => x && ({ win: x.win, lo: x.lo, hi: x.hi, n: x.n, tries: x.attempts, stall: x.stall, time: x.time, deaths: x.deaths, income: x.income, bank: x.bank ?? null, power: x.power ?? null, nearMiss: x.nearMiss });
+  const data = {
+    tp, tol, mtol, camp, personas, logDir, generated: new Date().toISOString().slice(0, 10),
+    stages: stageOrder.map((s, i) => ({
+      id: s, idx: i, target: targetFor(s, i), flags: flags[s], boss: bosses.has(s),
+      p: Object.fromEntries(personas.map((p) => [p, pick(S[s][p])])),
+      reach: Object.fromEntries(personas.map((p) => [p, reach(s, p)])),
+    })),
+  };
+  const read = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
+  const json = JSON.stringify(data).replace(/</g, '\\u003c');
+  fs.writeFileSync(arg('html'), read('template.html').replace('/*CSS*/', () => read('report.css')).replace('/*JS*/', () => read('report.js')).replace('"__DATA__"', () => json));
   console.log(`\nHTML report -> ${arg('html')}`);
 }

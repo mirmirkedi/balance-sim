@@ -19,14 +19,14 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Agentic tuning** (`tune.mjs`): the agent proposes parameter sets, the script measures them (loss, remaining flags, per-stage deltas, history); the agent interprets and iterates.
 - **Replay** any single run as a timeline (`--replay smart:7:12`).
 - **Calibrate** bots against real playtest numbers (`--humans`).
-- **HTML report** with curve, target band and flagged stages (`--html`).
+- **Interactive HTML report** (`--html`): summary cards, "look here first", metric and persona toggles, hover tooltips, click a stage for a plain-words explanation with what to try, sortable and filterable table, flag glossary, dark mode. One self-contained file, no network.
 
 ## Install
 
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
-npm test                                   # 14 end-to-end tests
+npm test                                   # 15 end-to-end tests
 ```
 
 Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
@@ -50,6 +50,7 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 |---|---|
 | `SKILL.md` | the skill (workflow, game kinds, personas, adapter contract, log format, verdicts) |
 | `scripts/runner.mjs` | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
+| `scripts/report/` | template, css and js of the interactive HTML report |
 | `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |
 | `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |
@@ -61,4 +62,4 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 
 ## Status
 
-Tested on three toy mechanics and one real game (PR-15, headless via `vm`; tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md). Bots are not humans: real playtests override the report. The HTML report's chart has not been checked in a browser yet (structure only).
+Tested on three toy mechanics and one real game (PR-15, headless via `vm`; tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md). Bots are not humans: real playtests override the report.
