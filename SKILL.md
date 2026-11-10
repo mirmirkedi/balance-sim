@@ -208,6 +208,19 @@ Also: cliff shape (all 100% then 0%: the ramp is a staircase), `tries` (>3 on a 
 - **Shell quoting.** In zsh an unquoted `$SETS` is not split into words, so `--set` flags silently vanish and you measure the defaults. Use arrays, `${=SETS}`, or call `tune.mjs` (it passes arguments as an array).
 - **Evaluate on a new seed** before declaring a candidate good; the tuner's own seed is overfitted. PR-15 went from 22 to 9 points mean error against the target on a fresh seed.
 
+## Warnings for agents using this skill
+
+- **Bots are not players.** Every number describes the bots. Never say "the game is balanced"; say "the reference bot wins X% first try". Real playtests or telemetry (`--humans`) override the bots. Right after a calibration, say what it did NOT check.
+- **Ask before changing anything that is not a report**: writing `targets.json`, applying a calibration candidate to game data, editing game files, swapping content types. Dry-run first (`target.mjs` prints, `--write` saves). The studio never edits game files; keep it that way.
+- **Check the game folder before every run.** `git status`, and make sure the files the adapter reads still exist. Someone else may change the tree mid-session (it happened: a prototype was replaced by another project). If the tree is in flux, run on a `git archive` export in a temp folder and never touch their files.
+- **Determinism first.** If the runner prints `NONDETERMINISTIC`, stop: route every random call through the seeded rng (a `Math.random` override in a vm adapter works). Nothing else is trustworthy until it is quiet.
+- **Noise is real.** Rounds of a calibration swing several points (a toy run moved 18-27 pts between rounds). Judge a change on a fresh seed with more runs, not on the round that looked best; thin late-stage data (`LOW_N`) needs `--retries 10` in campaign mode, and a flag with a `?` is not a verdict.
+- **One kind of change at a time.** Numeric levers first; add `--compose` only when stat scaling is not enough, and re-measure after. For puzzles give `compose.valid` (solver check): an unsolvable level is worse than a hard one. `power` per type is an estimate, verify it.
+- **Option balance is about the bot.** DOMINANT / DEAD describe what this persona picks. Buff the weak option, do not nerf the strong one; confirm with real play. Options outside `legalActions()` must honor `ban.<id>` or the ablation is meaningless (`BAN_IGNORED`).
+- **Genre numbers are not standards.** Quote `references/genres.json` with its `basis`; if it says judgment, say it is your judgment. If you research something new, write it back with sources.
+- **Shell traps (zsh)**: an unquoted `$VAR` is not word-split (use arrays or `${=VAR}`), so `--set` arguments can be silently dropped and a "verification" runs the defaults. Print the effective parameters of a verification run.
+- **Keep the repo clean.** No game data, personal names, paths of private projects or run logs in commits or screenshots (use a neutral demo folder). Follow the user's own rules for commit messages and attribution (check their CLAUDE.md); do not add trailers they forbid.
+
 ## Known limits
 
 - A bot is as good as its `policy`/`evaluate`. If `smart` is weak the curve is too pessimistic; a perfect solver makes it too optimistic. Calibrate with `--humans`, spot-check with `--replay`.

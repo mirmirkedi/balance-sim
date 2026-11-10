@@ -115,3 +115,7 @@ Tested on three toy mechanics and two real games:
 - **PR-14** (internal prototype, egg-nest tile puzzle, headless engine + exact solver): baseline measured, all 100 levels proven solvable, bots lose from level 11 on; not tuned yet because the intended difficulty is undecided.
 
 Known gaps: bots are not humans and are not calibrated to real players (use `--humans`); target curves in the examples are guesses; the `smart` policy of each game is simple; there is no LLM-played persona yet; a long run (3000+ runs with `optimizer`/`oracle`) takes tens of minutes. Real playtests override the report.
+
+## For agents
+
+Read `SKILL.md`, especially "Warnings for agents": bots are not players, ask before changing game data, check the game folder before every run, and keep determinism and noise in mind.
