@@ -7,6 +7,7 @@
 //
 //   node calibrate.mjs --adapter A --targets T --out dir [--rounds 6] [--runs 60] [--retries 10] [--campaign]
 //                      [--personas smart] [--seed 21] [--k 0.8] [--base params.json] [--stages 1-40]
+//                      [--lever stage|player|...] [--deadband 0.05]
 //                      [--compose] [--swap-at 0.15]      also swap enemy types where the adapter declares levers.compose
 //
 // Adapter contract (optional export):
@@ -30,14 +31,15 @@ const has = (n) => argv.includes('--' + n);
 if (!arg('adapter') || !arg('targets')) { console.error('usage: calibrate.mjs --adapter A --targets T --out dir [--rounds 6] [--runs 60]'); process.exit(1); }
 
 const adapter = (await import(pathToFileURL(path.resolve(arg('adapter'))).href)).default;
-const lever = adapter.levers && adapter.levers.stage;
-if (!lever) { console.error('[calib] this adapter declares no levers.stage, so there is nothing to calibrate automatically. Measure with a detection run and tune by hand or with the agent (SKILL.md, tuning loop).'); process.exit(2); }
+const leverName = arg('lever', 'stage');   // adapters may declare more numeric levers (levers.player ...): --lever player
+const lever = adapter.levers && adapter.levers[leverName];
+if (!lever) { console.error(`[calib] this adapter declares no levers.${leverName}, so there is nothing to calibrate automatically. Measure with a detection run and tune by hand or with the agent (SKILL.md, tuning loop).`); process.exit(2); }
 const T = JSON.parse(fs.readFileSync(arg('targets'), 'utf8'));
 const tp = T.targetPersona || 'smart';
 const out = path.resolve(arg('out', 'calib-out'));
 fs.mkdirSync(path.join(out, 'rounds'), { recursive: true });
 const rounds = +arg('rounds', 6), runs = +arg('runs', 60), seed0 = +arg('seed', 21), K = +arg('k', 0.8), retries = arg('retries', '10');
-const mode = lever.mode || 'mul', harder = lever.harder ?? 1, step = lever.step ?? 8, dead = +arg('deadband', 0.04);
+const mode = lever.mode || 'mul', harder = lever.harder ?? 1, step = lever.step ?? 8, dead = +arg('deadband', 0.05);
 const base = arg('base') && fs.existsSync(arg('base')) ? JSON.parse(fs.readFileSync(arg('base'), 'utf8')) : {};
 const comp = adapter.levers && adapter.levers.compose;
 if (has('compose') && !comp) console.error('[calib] --compose given but the adapter declares no levers.compose: only the numeric lever is used.');
@@ -127,7 +129,8 @@ for (let r = 1; r <= rounds; r++) {
   for (const [s, st] of Object.entries(m.stages)) {
     if (!vals.has(s) || st.win == null || st.target == null || st.n < 12) continue;
     const delta = st.win - st.target;               // > 0: easier than the target
-    if (Math.abs(delta) < dead) continue;
+    // noise guard: a stage is only touched when it is off by more than the dead band AND by more than one standard error of its measurement
+    if (Math.abs(delta) < Math.max(dead, Math.sqrt(Math.max(st.win * (1 - st.win), 0.04) / st.n))) continue;
     if (useComp && Math.abs(delta) >= swapAt) {   // far off: change WHICH enemies, then let the numeric lever fine-tune next round
       const r = rosters.get(s), total = Object.entries(r).reduce((a, [k, n]) => a + n * power(k), 0), want = total * (Math.exp(K * delta * harder) - 1);
       const sw = bestSwap(r, want, s);
@@ -152,7 +155,16 @@ const changes = Object.entries(best.params).filter(([k]) => !(k in base)).map(([
   const s = ids.find((x) => paramOf(x) === k);
   return { stage: s, param: k, from: s != null ? snap(baseline(s)) : null, to: v };
 });
-const result = { status: 'done', targetPersona: tp, lever: progress.lever, bestRound: best.round, before, after, params: best.params, changes, rounds: progress.rounds, runs, verifyRuns: vRuns, finishedAt: new Date().toISOString() };
+// a lever pushed far from where the game started is a warning sign: the stat is doing a job another part of the game should do
+const warnings = [];
+for (const c of changes) {
+  if (c.kind === 'compose' || c.from == null) continue;
+  const f = +c.from, t = +c.to;
+  if (mode === 'mul' && f > 0 && (t / f > 4 || t / f < 0.25)) warnings.push({ stage: c.stage, param: c.param, text: `stage ${c.stage}: ${c.param} moved ${f} -> ${t} (x${(t / f).toFixed(1)}). One number is carrying the whole correction: look at another lever (the player's power, the enemy mix, the economy) before shipping this.` });
+  else if (mode === 'add' && lever.min != null && lever.max != null && (t <= lever.min || t >= lever.max)) warnings.push({ stage: c.stage, param: c.param, text: `stage ${c.stage}: ${c.param} sits at its limit (${t}). The lever cannot do more; the cause is somewhere else.` });
+}
+for (const w of warnings) console.log('[calib] WARNING ' + w.text);
+const result = { status: 'done', warnings, targetPersona: tp, lever: progress.lever, bestRound: best.round, before, after, params: best.params, changes, rounds: progress.rounds, runs, verifyRuns: vRuns, finishedAt: new Date().toISOString() };
 fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify(result, null, 1));
 progress.status = 'done'; save();
 if (registered) { const m = JSON.parse(fs.readFileSync(metaPath, 'utf8')); m.status = 'done'; m.endedAt = new Date().toISOString(); m.summary = { before: Math.round(before.loss * 1000) / 10, after: Math.round(after.loss * 1000) / 10, changed: changes.length }; fs.writeFileSync(metaPath, JSON.stringify(m, null, 2) + '\n'); }

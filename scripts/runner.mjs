@@ -50,7 +50,9 @@ if (sel) stages = /^\d+(-\d+)?$/.test(sel)
 // --shard i/N (set by the parent when --jobs > 1): this process plays only the runs with index % N == i
 const shard = arg('shard') ? (([i, n]) => ({ i, n }))(arg('shard').split('/').map(Number)) : null;
 const cores = (os.availableParallelism ? os.availableParallelism() : os.cpus().length);
-let jobs = has('jobs') ? Math.max(1, +arg('jobs')) : Math.max(1, Math.min(8, cores - 1));
+// default workers: free cores (cores minus the current load), at most 8; an adapter can lower it (adapter.maxJobs, e.g. a heavy engine)
+let jobs = has('jobs') ? Math.max(1, +arg('jobs')) : Math.max(1, Math.min(8, Math.round(cores - os.loadavg()[0]) - 1));
+jobs = Math.min(jobs, adapter.maxJobs || Infinity, (adapter.external && adapter.external.maxJobs) || Infinity);
 if (shard || arg('replay')) jobs = 1;
 jobs = Math.min(jobs, Math.max(1, runs));
 
@@ -74,6 +76,42 @@ const flush = (persona, stage, lines) => {
   if (replay) { if (stage === replay.stage) replay.lines.push(...lines.map((l) => JSON.parse(l))); }
   else fs.appendFileSync(path.join(outDir, persona + '.jsonl'), lines.join('\n') + '\n');
 };
+
+// ---- external adapter: the game runs in ANOTHER program (Godot, Unity, a browser, Python ...) that writes balance-sim logs ----
+// adapter.external = { command(ctx) -> { command, args, cwd?, env? }, maxJobs? }  ctx = { persona, runs, runFrom, seed, stages (ids), stageArg,
+// campaign, retries, params, out }. The program plays `runs` runs starting at run number `runFrom` and writes JSONL (same format as
+// below) to <ctx.out>/<persona>*.jsonl. The runner splits runs into slices, runs them in parallel and joins the files.
+if (adapter.external) {
+  if (replay) { console.error('--replay is not available for external adapters: replay inside the game program.'); process.exit(1); }
+  const J = Math.max(1, jobs), per = Math.max(1, Math.min(runs, Math.floor(J / personas.length) || 1)), tasks = [];
+  for (const p of personas) for (let j = 0; j < per; j++) {
+    const from = Math.floor(runs * j / per), n = Math.floor(runs * (j + 1) / per) - from;
+    if (n > 0) tasks.push({ p, from, n, out: path.join(os.tmpdir(), `bsim-ext-${process.pid}-${p}-${from}`) });
+  }
+  const t1 = Date.now(); let next = 0, failed = null;
+  const runTask = (t) => new Promise((resolve) => {
+    fs.mkdirSync(t.out, { recursive: true });
+    const spec = adapter.external.command({ persona: t.p, runs: t.n, runFrom: t.from, seed: seed0, stages: stages.map(String), stageArg: sel || null, campaign, retries, params, out: t.out });
+    const c = spawn(spec.command, spec.args || [], { cwd: spec.cwd || process.cwd(), env: { ...process.env, ...(spec.env || {}) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let tail = ''; const keep = (d) => { tail = (tail + d).slice(-2000); };
+    c.stdout.on('data', keep); c.stderr.on('data', keep);
+    c.on('error', (e) => { failed = failed || `could not start ${spec.command}: ${e.message}`; resolve(); });
+    c.on('close', (code) => { if (code !== 0) failed = failed || `${t.p} slice from run ${t.from} exited with ${code}:\n${tail}`; resolve(); });
+  });
+  const worker = async () => { while (next < tasks.length && !failed) await runTask(tasks[next++]); };
+  console.error(`  external adapter: ${tasks.length} slices, ${Math.min(J, tasks.length)} at a time`);
+  await Promise.all(Array.from({ length: Math.min(J, tasks.length) }, worker));
+  if (failed) { console.error('external run failed: ' + failed); process.exit(1); }
+  let total = 0;
+  for (const t of tasks) for (const f of fs.readdirSync(t.out).sort()) {
+    if (!f.endsWith('.jsonl') || !f.startsWith(t.p) || !/^[._]/.test(f.slice(t.p.length))) continue;
+    const body = fs.readFileSync(path.join(t.out, f), 'utf8'); total += body.split('\n').filter((l) => l.includes('"type":"end"')).length;
+    fs.appendFileSync(path.join(outDir, t.p + '.jsonl'), body.endsWith('\n') || !body ? body : body + '\n');
+  }
+  for (const t of tasks) fs.rmSync(t.out, { recursive: true, force: true });
+  console.log(`balance-sim: ${total} ${campaign ? 'attempts (campaign)' : 'runs'} (${personas.join(', ')}) x ${stages.length} stages x ${runs} in ${((Date.now() - t1) / 1000).toFixed(1)}s via external adapter (${tasks.length} slices) -> ${outDir}/`);
+  process.exit(0);
+}
 
 // Guard: the same seed must give the same run. A game that calls Math.random() directly makes every comparison noise.
 if (!replay && !has('no-check')) {

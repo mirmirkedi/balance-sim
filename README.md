@@ -1,7 +1,7 @@
 # balance-sim
 
 Game-independent balance simulator and studio, packaged as a Claude Code skill.
-Bots play every stage thousands of times and log every shot / kill / drop / purchase. You see how hard the game is, set how hard it should be (whole game, single stages, template curves), and let the studio calibrate towards it. Works for turn based, puzzle, real time, idle and campaign games.
+Bots play every stage thousands of times and log every shot / kill / drop / purchase. You see how hard the game is, set how hard it should be (whole game, single stages, template curves), and let the studio calibrate towards it. Works for turn based, puzzle, real time, idle and campaign games, written in Node or in another engine (Godot, Unity, a browser: the game program just writes the logs).
 
 Requirements: Node 18+, no npm dependencies. The web app listens on 127.0.0.1 only and never edits your game files.
 
@@ -18,6 +18,10 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
 - **Personas** `random`, `novice`, `smart`, `optimizer` (2-move lookahead) and `oracle` (the game's exact solver, for puzzles). The gaps between them show skill depth, mistake cost and weak policies.
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
+- **Several levers, not one number.** Per stage it can scale a stat (`levers.stage`), swap the stage's content types (enemies, tile types, obstacles: `levers.compose`, `--compose`, with a `valid()` veto for unsolvable puzzles) or use another declared lever (`--lever player`). It skips stages that are only noise, and warns when one lever is pushed far (a x20 multiplier means the cause is elsewhere).
+- **Option balance** (`options.mjs`): how often each action or upgrade is chosen and how much the win rate drops without it: dead, mandatory, dominant options.
+- **Any engine.** Node games get an adapter. A game in Godot, Unity or anything else gets an *external runner* adapter: balance-sim starts your program, which plays the bots and writes the same logs; analysis, studio and calibration work unchanged. Template: `examples/external-runner/`.
+- **Parallel by default.** The runner splits runs across worker processes (`--jobs N`, default free cores, at most 8) and the logs are identical to a single process.
 - **Sweep** one parameter over several values and pick the best (`sweep.mjs`).
 - **Agentic tuning** (`tune.mjs`): the agent proposes parameter sets, the script measures them (loss, remaining flags, per-stage deltas, history); the agent interprets and iterates.
 - **Genre-aware advice.** The right curve depends on the kind of game. `references/genres.json` holds what is known per type (puzzle, roguelike, tower defense, idle RPG, action, card) with an honest confidence level and sources; the studio shows it next to the target editor and the agent researches the web when a type is missing, then writes the findings back. There is no sourced numeric benchmark for most genres, and the tool says so.
@@ -30,7 +34,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 You do not write any code. You talk to Claude Code in the game's folder:
 
 1. **Install once** (below), then say "balance this game" (or "balance layalım") or run `/balance-studio`.
-2. **Claude builds the connector first.** The studio needs a small adapter file in the game (`tools/balance/adapter.mjs`) that lets the bots play it: which actions exist, how a step works, who won. Claude reads your game and writes it (it reuses a headless engine or an existing bot if the game has one, otherwise it runs the real game code in a Node `vm`). It also declares the one number per stage that makes it harder or easier (`levers`), so calibration can work. Claude checks the adapter with a short run before going on.
+2. **Claude builds the connector first.** The studio needs a small adapter file in the game (`tools/balance/adapter.mjs`) that lets the bots play it: which actions exist, how a step works, who won. Claude reads your game and writes it (it reuses a headless engine or an existing bot if the game has one, runs single-file web games in a Node `vm`, and for Godot or Unity games uses an external-runner adapter around the game's own bot program). It also declares what calibration may change per stage (`levers`: a stat multiplier, optionally the content mix or another lever), so calibration can work. Claude checks the adapter with a short run before going on.
 3. **Claude starts the studio** (`node ~/.claude/skills/balance-sim/scripts/studio.mjs`) and gives you the URL.
 4. **You use the four steps in the browser:**
    - **Detect.** See how hard the game is *right now*: an average difficulty and a difficulty score for every stage. No target needed yet.
@@ -51,7 +55,7 @@ Bots are not humans: the scores describe the bots. A real playtest of the change
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
-npm test                                   # 22 end-to-end tests
+npm test                                   # 29 end-to-end tests
 ```
 
 Then in Claude Code, in the game's folder: `/balance-studio`, or just say "balance this game" / "balance layalım" (Claude asks whether to use this skill).
@@ -84,7 +88,7 @@ node scripts/runner.mjs  --adapter examples/toy-autobattle/adapter.mjs --campaig
 node scripts/runner.mjs  --adapter examples/toy-wave/adapter.mjs --replay smart:7:12
 ```
 
-Write an adapter for your own game from `templates/adapter.template.mjs`. Workflow, adapter contract, log format and the verdict table: [SKILL.md](SKILL.md).
+Write an adapter for your own game from `templates/adapter.template.mjs` (Node games) or `examples/external-runner/adapter.mjs` (a game in another engine). Workflow, adapter contract, log format and the verdict table: [SKILL.md](SKILL.md).
 
 ## Layout
 
@@ -103,7 +107,7 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |
 | `scripts/personas.mjs`, `lib.mjs`, `rng.mjs` | personas (+ `chooseItem` for shops), shared run loop, seeded RNG |
 | `templates/` | adapter and target-curve templates |
-| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr14-puzzle` and `pr15-html-vm` (reference adapters of two real prototypes: one wraps a headless engine and an exact solver, the other runs a single-HTML game in a Node `vm`; they need those games to run). Start from `toy-wave` for a complete example with the studio levers. |
+| `examples/` | `toy-wave` (turn based, with stat and content-mix levers), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `external-runner` (template for games in Godot/Unity/other programs), `pr14-puzzle` and `pr15-html-vm` (reference adapters of two real prototypes: one wraps a headless engine and an exact solver, the other runs a single-HTML game in a Node `vm`; they need those games to run). Start from `toy-wave` for a complete example with the studio levers. |
 | `commands/` | the `/balance` and `/balance-studio` slash commands |
 | `CHANGELOG.md` | what changed per version |
 | `test/` | end-to-end tests (`npm test`) |
@@ -114,7 +118,9 @@ Tested on three toy mechanics and two real games:
 - **PR-15** (internal prototype, single-HTML idle RPG, headless via `vm`): tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md.
 - **PR-14** (internal prototype, egg-nest tile puzzle, headless engine + exact solver): baseline measured, all 100 levels proven solvable, bots lose from level 11 on; not tuned yet because the intended difficulty is undecided.
 
-Known gaps: bots are not humans and are not calibrated to real players (use `--humans`); target curves in the examples are guesses; the `smart` policy of each game is simple; there is no LLM-played persona yet; a long run (3000+ runs with `optimizer`/`oracle`) takes tens of minutes. Real playtests override the report.
+- **PR-15 Godot port** (internal, Godot 4.7, bots run the real game code headless): the external-runner adapter ran a short smoke test against it (3 stages, 2 players) and the analysis worked on the logs. A full calibration through balance-sim has not been done there yet.
+
+Known gaps: the player's own power curve is not a lever unless the adapter declares one (`--lever player`); a Godot/Unity project needs a bot program that writes the logs (the template shows the contract; no generic one exists); no screenshots in this README yet; bots are not humans and are not calibrated to real players (use `--humans`); target curves in the examples are guesses; the `smart` policy of each game is simple; there is no LLM-played persona yet; a long run (3000+ runs with `optimizer`/`oracle`) takes tens of minutes. Real playtests override the report.
 
 ## For agents
 

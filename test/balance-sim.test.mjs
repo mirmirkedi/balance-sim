@@ -324,3 +324,33 @@ test('runner --jobs gives exactly the same logs as a single process', () => {
     assert.deepEqual(lines(b), lines(a));
   }
 });
+
+test('external adapter: the runner starts the game program in slices and joins its logs', () => {
+  const prog = path.join(tmp, 'fake-game.mjs'), ad = path.join(tmp, 'ext-adapter.mjs');
+  fs.writeFileSync(prog, `import fs from 'node:fs'; import path from 'node:path';
+const a = process.argv.slice(2), g = (k) => a[a.indexOf('--' + k) + 1];
+const [persona, from, n, out, stages] = [g('persona'), +g('run-from'), +g('runs'), g('out'), g('stages').split(',')];
+fs.mkdirSync(out, { recursive: true }); const lines = [];
+for (let r = from; r < from + n; r++) for (const s of stages) lines.push(JSON.stringify({ type: 'end', run: r, persona, stage: s, win: ((r * 31 + +s * 17) % 10) < 6, hpLeft: 5, hpMax: 10, time: 10, deaths: 0, income: 1 }));
+fs.writeFileSync(path.join(out, persona + '_' + from + '.jsonl'), lines.join('\\n') + '\\n');`);
+  fs.writeFileSync(ad, `export default { stages: ['1', '2', '3'], external: { command: (c) => ({ command: process.execPath, args: [${JSON.stringify(prog)}, '--persona', c.persona, '--run-from', String(c.runFrom), '--runs', String(c.runs), '--out', c.out, '--stages', c.stages.join(',')] }) } };`);
+  const lines2 = (dir) => fs.readFileSync(path.join(dir, 'smart.jsonl'), 'utf8').split('\n').filter(Boolean).sort();
+  const a = path.join(tmp, 'ext1'), b = path.join(tmp, 'ext3');
+  run('runner.mjs', ['--adapter', ad, '--personas', 'smart', '--runs', '10', '--jobs', '1', '--out', a]);
+  run('runner.mjs', ['--adapter', ad, '--personas', 'smart', '--runs', '10', '--jobs', '3', '--out', b]);
+  assert.equal(lines2(a).length, 30);
+  assert.deepEqual(lines2(b), lines2(a));
+  run('analyze.mjs', ['--logs', b, '--out', path.join(b, 'report.json')]);          // the normal pipeline works on external logs
+  assert.ok(JSON.parse(fs.readFileSync(path.join(b, 'report.json'), 'utf8')).stages['2']);
+});
+
+test('calibrate warns when one lever is pushed far, and --lever picks another declared lever', () => {
+  const ad = path.join(tmp, 'strain-adapter.mjs'), tg = path.join(tmp, 'strain-targets.json');
+  fs.writeFileSync(ad, `import base from ${JSON.stringify(adapter('toy-wave'))};
+export default { ...base, levers: { stage: base.levers.stage, strong: { ...base.levers.stage, min: 0.01, max: 100 } } };`);
+  fs.writeFileSync(tg, JSON.stringify({ targetPersona: 'smart', tolerance: 0.1, stages: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i + 1), { firstTryWin: 0.02 }])) }));
+  const out = path.join(tmp, 'strain');
+  run('calibrate.mjs', ['--adapter', ad, '--targets', tg, '--out', out, '--rounds', '6', '--runs', '30', '--lever', 'strong', '--k', '2.5']);
+  const res = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8'));
+  assert.ok(Array.isArray(res.warnings) && res.warnings.length > 0 && /another lever/.test(res.warnings[0].text));
+});

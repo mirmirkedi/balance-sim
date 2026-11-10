@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.4.0
+- **External runner adapters** for games in Godot, Unity or any other program: `adapter.external.command(ctx)`; the runner slices runs, runs copies in parallel and joins the logs. Template `examples/external-runner/`; smoke-tested on the Godot port of PR-15.
+- Calibration safety nets: noise guard (dead band plus one standard error), warnings when a lever is pushed far, `--lever <name>` for other declared levers.
+- Default `--jobs` follows free cores (cores minus load); adapters can cap it with `maxJobs`.
 - **Parallel runner**: `--jobs N` (default cores - 1, max 8). Same seeds, byte-for-byte same logs as one process (tested), about 3x faster on 4 workers. Detect, calibrate, options and sweep use it automatically. SKILL.md tells agents how to parallelize independent work without oversubscribing the CPU.
 - **Content mix as a lever**: adapter `levers.compose` + `calibrate.mjs --compose` swap content types per stage (enemies, tile types, obstacles: "2 grunts -> 2 archers", "2 plain tiles -> 2 stones") when a stage is far off target, then the numeric lever fine-tunes. Adapter-defined `noun`, `power` per type, optional `valid(stage, mix)` to refuse unplayable mixes (unsolvable puzzles). Studio: "Also swap ... types" checkbox, mixes shown in the changes table.
 - **Option balance**: `scripts/options.mjs` (usage share + ablation: win-rate change when one option is removed, verdicts DEAD / MANDATORY / DOMINANT / HARMFUL). Runner now counts chosen actions (`acts` on every `end` event) and supports `--set ban.<option>=1`.

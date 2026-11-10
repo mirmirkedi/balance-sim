@@ -140,7 +140,18 @@ result(): {win, hpLeft, hpMax, time, deaths, income, resources}
 ```
 Always: fixed dt per step, no `Math.random()`, deterministic in `seed`, `clone()` reseeds its own random stream (otherwise the lookahead sees future rolls), emit events for everything that matters.
 
+## Games in other engines (Godot, Unity, browser, Python): external runner
+
+If the game does not run in Node, do not rewrite it. The game needs a **bot program** (a headless script inside the game that plays with the personas and writes balance-sim logs). Then `examples/external-runner/adapter.mjs` tells balance-sim how to start it:
+```
+external: { command: (c) => ({ command: 'godot', args: ['--headless', '--path', P, '--script', S, '--', '--out', c.out, '--personas', c.persona,
+            '--runs', String(c.runs), '--run-from', String(c.runFrom), '--seed', String(c.seed), '--stages', c.stageArg, ...sets], cwd: P }), maxJobs }
+```
+The runner splits the runs into slices (`runFrom`, `runs`), starts several copies in parallel (each needs its own save and temp files), and joins `<out>/<persona>*.jsonl`. `analyze`, `detect`, the studio and `calibrate` then work as for any adapter. Rules: the same run number must give the same game (seeded); take game parameters from `--set key=value` (that is how calibration changes the game); lower `maxJobs` for heavy engines (memory!); `--replay` and the oracle persona are not available (replay inside the game). Check first that the game folder is on the branch you think it is, and run a 2-run smoke test before a long run. Proven: the Godot port of PR-15 (3-stage smoke test, logs analyzed). Levers for such a game are parameters the bot program accepts through `--set` (a damage table entry, a count); declare them in `levers` as usual.
+
 ## Enemy mix and option balance (beyond one number per stage)
+
+**Calibration safety nets.** `calibrate.mjs` only touches a stage that is off by more than the dead band (5 pts) AND more than one standard error of its measurement, so it does not chase noise. At the end it warns when a lever was pushed far (a multiplier beyond x4 or below x0.25, or a limit reached): that means one number carries a correction that belongs elsewhere (the player's power, the enemy mix, the economy). Do not ship such a result without telling the user. `--lever <name>` runs the same loop on another declared numeric lever (`levers.player`: bigger = stronger player, `harder: -1`).
 
 **Content mix (enemies, tile types, obstacles, pickups).** A stage can be made harder by scaling numbers (`levers.stage`) OR by changing WHICH content it is built from: "level 12: two archers instead of two grunts" in an action game, "two stone blocks instead of two plain tiles" in a tile puzzle, a harder pickup table in an idle game. Declare it with `levers.compose`; what the types are depends on the game, so look at how its stages are made first (spawn list, grid cells, drop table):
 ```
