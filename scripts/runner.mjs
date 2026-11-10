@@ -7,6 +7,8 @@
 //                   [--set key=value ...]            params for the adapter (also used by sweep.mjs)
 //                   [--campaign] [--retries 2]       one player lives through all stages, keeps a profile
 //                   [--replay persona:stage:run]     re-simulate one run and print it as a timeline
+//                   [--jobs N]                       worker processes (default: CPU cores - 1, at most 8; 1 = off). Runs are split
+//                                                    between workers, seeds depend only on (stage, run), so the result is identical to --jobs 1.
 //
 // Log files: <out>/<persona>.jsonl, one JSON object per line.
 //   type "end"   : one per attempt (always written)  {win, hpLeft, hpMax, time, deaths, income, resources, timeout, steps, error, acts}
@@ -15,8 +17,10 @@
 //   other types  : game events from adapter emit() (only for the first --full runs per persona+stage)
 // Every line also carries: run, seed, persona, stage, step, t.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { spawn } from 'node:child_process';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { PERSONAS } from './personas.mjs';
 import { mulberry32 } from './rng.mjs';
 import { playRun, seedFor, parseSet, fmtEvent } from './lib.mjs';
@@ -42,6 +46,13 @@ const sel = arg('stages');
 if (sel) stages = /^\d+(-\d+)?$/.test(sel)
   ? (([a, b]) => all.slice(a - 1, (b || a)))(sel.split('-').map(Number))
   : sel.split(',').map((s) => all.find((x) => String(x) === s)).filter((x) => x !== undefined);
+
+// --shard i/N (set by the parent when --jobs > 1): this process plays only the runs with index % N == i
+const shard = arg('shard') ? (([i, n]) => ({ i, n }))(arg('shard').split('/').map(Number)) : null;
+const cores = (os.availableParallelism ? os.availableParallelism() : os.cpus().length);
+let jobs = has('jobs') ? Math.max(1, +arg('jobs')) : Math.max(1, Math.min(8, cores - 1));
+if (shard || arg('replay')) jobs = 1;
+jobs = Math.min(jobs, Math.max(1, runs));
 
 // --replay persona:stage:run
 let replay = null;
@@ -76,9 +87,33 @@ if (!replay && !has('no-check')) {
   catch (e) { /* adapters that need a campaign profile are checked only in --campaign mode */ }
 }
 
+// ---- parallel: split the runs between worker processes, then concatenate their logs ----
+if (jobs > 1 && !replay) {
+  const strip = (a, flag) => { const o = []; for (let i = 0; i < a.length; i++) { if (a[i] === flag) { i++; continue; } o.push(a[i]); } return o; };
+  let base = argv; for (const f of ['--jobs', '--out', '--shard', '--no-check']) base = strip(base, f);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bsim-par-')), t1 = Date.now();
+  const self = fileURLToPath(import.meta.url);
+  const kids = Array.from({ length: jobs }, (_, i) => new Promise((resolve) => {
+    const out = path.join(tmp, String(i));
+    const c = spawn(process.execPath, [self, ...base, '--jobs', '1', '--shard', `${i}/${jobs}`, '--no-check', '--out', out], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let so = '', se = '';
+    c.stdout.on('data', (d) => { so += d; }); c.stderr.on('data', (d) => { se += d; if (i === 0) process.stderr.write(d); });
+    c.on('close', (code) => resolve({ i, out, code, so, se }));
+  }));
+  const done = await Promise.all(kids);
+  const bad = done.find((k) => k.code !== 0);
+  if (bad) { console.error('worker ' + bad.i + ' failed:\n' + bad.se.slice(-1500)); process.exit(1); }
+  let n = 0;
+  for (const k of done) { n += +((/balance-sim: (\d+)/.exec(k.so) || [])[1] || 0); }
+  for (const p of personas) for (const k of done) { const f = path.join(k.out, p + '.jsonl'); if (fs.existsSync(f)) fs.appendFileSync(path.join(outDir, p + '.jsonl'), fs.readFileSync(f)); }
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log(`balance-sim: ${n} ${campaign ? 'attempts (campaign)' : 'runs'} (${personas.join(', ')}) x ${stages.length} stages x ${runs} in ${((Date.now() - t1) / 1000).toFixed(1)}s with ${jobs} workers -> ${outDir}/`);
+  process.exit(0);
+}
+
 const t0 = Date.now();
 let total = 0;
-const runIdxs = (n) => replay ? [replay.run] : Array.from({ length: n }, (_, i) => i);
+const runIdxs = (n) => replay ? [replay.run] : Array.from({ length: n }, (_, i) => i).filter((i) => !shard || i % shard.n === shard.i);
 
 for (const persona of personas) {
   if (!replay && personas.length > 1) console.error(`  ${persona} ... (${((Date.now() - t0) / 1000).toFixed(0)}s elapsed)`);

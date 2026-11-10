@@ -208,6 +208,13 @@ Also: cliff shape (all 100% then 0%: the ramp is a staircase), `tries` (>3 on a 
 - **Shell quoting.** In zsh an unquoted `$SETS` is not split into words, so `--set` flags silently vanish and you measure the defaults. Use arrays, `${=SETS}`, or call `tune.mjs` (it passes arguments as an array).
 - **Evaluate on a new seed** before declaring a candidate good; the tuner's own seed is overfitted. PR-15 went from 22 to 9 points mean error against the target on a fresh seed.
 
+## Speed: parallel runs (tool and agents)
+
+- **The runner is parallel by default**: `--jobs N` (default = CPU cores - 1, at most 8; `--jobs 1` turns it off). Runs are split between worker processes; seeds depend only on (stage, run), so the logs are identical to a single process (tested). It speeds up detect, calibrate rounds, `options.mjs` and sweeps alike (about 3x with 4 workers on the toy game). `--replay` always runs in one process.
+- **Agents may work in parallel too**, but only on independent things: different games, or different questions about one game (a detection and an `options.mjs` ablation), each with its own `--out` folder. Calibration rounds depend on the previous round and stay sequential. Never let two processes write the same run folder or the same `targets.json`.
+- **Do not oversubscribe the machine.** All parallel work shares the same cores: with K tasks at once, pass `--jobs` about cores/K to each, otherwise everything slows down and timing-based guard rails misfire. The studio runs one job at a time on purpose.
+- If a worker fails, the runner prints its error and stops; a game with global state is fine (every worker is its own process), a game that writes files during play is not (give each run its own folder or turn `--jobs 1`).
+
 ## Warnings for agents using this skill
 
 - **Bots are not players.** Every number describes the bots. Never say "the game is balanced"; say "the reference bot wins X% first try". Real playtests or telemetry (`--humans`) override the bots. Right after a calibration, say what it did NOT check.

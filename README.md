@@ -91,7 +91,7 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | path | what |
 |---|---|
 | `SKILL.md` | the skill (workflow, game kinds, personas, adapter contract, log format, verdicts) |
-| `scripts/runner.mjs` | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
+| `scripts/runner.mjs` (parallel by default, `--jobs N`) | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
 | `scripts/report/` | template, css and js of the interactive HTML report |
 | `scripts/studio.mjs`, `scripts/studio/` | the web app: local server + single page app (detect, target, calibrate, logs) |
 | `scripts/detect.mjs`, `scripts/target.mjs` | conversation mode: measure with scores, preview and write a target from the command line |

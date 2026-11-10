@@ -313,3 +313,14 @@ export default { ...base, levers: { ...base.levers, compose: { ...base.levers.co
   const res = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8'));
   assert.ok(res.changes.filter((c) => c.kind === 'compose').every((c) => !/archer/.test(c.to)));
 });
+
+test('runner --jobs gives exactly the same logs as a single process', () => {
+  const lines = (dir) => fs.readFileSync(path.join(dir, 'smart.jsonl'), 'utf8').split('\n').filter(Boolean).sort();
+  for (const extra of [[], ['--campaign', '--retries', '2']]) {
+    const a = path.join(tmp, 'ser' + extra.length), b = path.join(tmp, 'par' + extra.length);
+    const common = ['--adapter', adapter(extra.length ? 'toy-autobattle' : 'toy-wave'), '--personas', 'smart', '--runs', '17', '--stages', '1-6', ...extra];
+    run('runner.mjs', [...common, '--jobs', '1', '--out', a]);
+    run('runner.mjs', [...common, '--jobs', '3', '--out', b]);
+    assert.deepEqual(lines(b), lines(a));
+  }
+});
