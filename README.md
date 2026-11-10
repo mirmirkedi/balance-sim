@@ -96,7 +96,8 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/studio.mjs`, `scripts/studio/` | the web app: local server + single page app (detect, target, calibrate, logs) |
 | `scripts/detect.mjs`, `scripts/target.mjs` | conversation mode: measure with scores, preview and write a target from the command line |
 | `scripts/model.mjs`, `scripts/project.mjs` | shared scores and target model (web and command line use the same numbers), run folder helpers |
-| `scripts/calibrate.mjs` | moves per-stage levers until the measured curve meets the target (used by the studio, also a CLI) |
+| `scripts/calibrate.mjs` | moves per-stage levers until the measured curve meets the target; `--compose` also swaps enemy types (used by the studio, also a CLI) |
+| `scripts/options.mjs` | option balance: how often each action/upgrade is chosen and what the win rate loses when it is removed (dead, mandatory, dominant options) |
 | `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |
 | `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |

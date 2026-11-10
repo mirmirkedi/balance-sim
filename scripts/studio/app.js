@@ -395,6 +395,7 @@ function viewCalibrate(root) {
     h('div', null, h('label', null, 'Runs per stage per round'), h('input', { type: 'number', min: 20, max: 500, value: cf.runs, oninput: (e) => { cf.runs = +e.target.value; } })),
     h('div', null, h('label', null, 'Strength of each correction'), h('select', { onchange: (e) => { cf.k = +e.target.value; } }, [[0.5, 'Gentle'], [0.8, 'Normal'], [1.2, 'Strong']].map(([v, l]) => h('option', { value: v, selected: cf.k === v }, l))))));
   if (A.st.config.candidate) box.append(h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: cf.useCand, onchange: (e) => { cf.useCand = e.target.checked; } }), 'Start from the active candidate'));
+  if (info.compose) box.append(h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!cf.compose, onchange: (e) => { cf.compose = e.target.checked; } }), 'Also swap enemy types where a stage is far off target (' + info.compose.types.map((t) => t.id).join(', ') + ')'));
   box.append(h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'primary', disabled: running || !lv || !hasTarget, onclick: startCalib }, running ? 'A job is running…' : 'Run calibration'), h('span', { class: 'hint' }, `About ${cf.rounds + 2} measurements of ${info.stages.length} stages × ${cf.runs} runs.`)));
   root.append(box);
   const lc2 = liveCard(); if (lc2) root.append(lc2);
@@ -409,7 +410,7 @@ function viewCalibrate(root) {
 async function startCalib(ev) {
   const cf = A.cform, btn = ev && ev.currentTarget;
   if (btn) { btn.disabled = true; btn.textContent = 'Starting\u2026'; }
-  try { const meta = await api('/api/jobs', { body: { kind: 'calibrate', rounds: cf.rounds, runs: cf.runs, k: cf.k, retries: A.form.retries, seed: A.form.seed, useCandidate: cf.useCand } }); A.calib = null; A.calibRunId = meta.id; await afterStart(meta.id); } catch (e) { toast(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Run calibration'; } }
+  try { const meta = await api('/api/jobs', { body: { kind: 'calibrate', rounds: cf.rounds, runs: cf.runs, k: cf.k, retries: A.form.retries, seed: A.form.seed, useCandidate: cf.useCand, compose: !!cf.compose } }); A.calib = null; A.calibRunId = meta.id; await afterStart(meta.id); } catch (e) { toast(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Run calibration'; } }
 }
 function lossChart(rounds, total) {
   const w = 520, hgt = 140, pad = 34, mx = Math.max(10, ...rounds.map((r) => r.loss * 100)) * 1.1;
@@ -445,7 +446,7 @@ function calibResults(out, d) {
   out.append(h('h3', { style: 'margin-top:14px' }, 'Difficulty before and after'), cbox); chart.draw();
   const unit = res.lever.unit || '';
   const tw = h('div', { class: 'tablewrap' }, h('table', null, h('thead', null, h('tr', null, h('th', null, 'Stage'), h('th', null, 'From'), h('th', null, 'To'), h('th', null, 'Gap before'), h('th', null, 'Gap after'))),
-    h('tbody', null, res.changes.map((c) => { const gb = b.stages[c.stage], ga = a.stages[c.stage]; const g = (x) => x && x.win != null && x.target != null ? sgn(Math.round(100 * (x.win - x.target))) : '-'; return h('tr', null, h('td', null, c.stage), h('td', null, c.from + (unit ? ' ' + unit : '')), h('td', null, h('b', null, c.to + (unit ? ' ' + unit : ''))), h('td', null, g(gb)), h('td', null, g(ga))); }))));
+    h('tbody', null, res.changes.map((c) => { const gb = b.stages[c.stage], ga = a.stages[c.stage]; const g = (x) => x && x.win != null && x.target != null ? sgn(Math.round(100 * (x.win - x.target))) : '-'; return h('tr', null, h('td', null, c.stage), h('td', null, c.kind === 'compose' ? 'enemies ' + c.from : c.from + (unit ? ' ' + unit : '')), h('td', null, h('b', null, c.kind === 'compose' ? c.to : c.to + (unit ? ' ' + unit : ''))), h('td', null, g(gb)), h('td', null, g(ga))); }))));
   out.append(h('h3', { style: 'margin-top:14px' }, 'What it changed'), res.changes.length ? tw : h('p', { class: 'hint' }, 'Nothing: every stage was already inside the dead band.'));
   const prompt = () => `Apply the balance-sim calibration "${run.id}" to the game in ${A.st.dir}.\nThe adapter lever is "${res.lever.param}" (${res.lever.mode === 'mul' ? 'multiplier' : 'added ' + (unit || 'units')}, bigger = ${res.lever.harder > 0 ? 'harder' : 'easier'}); see ${A.st.adapter} for how it maps to the game's data files.\nChange ONLY these stages, one data file at a time, with one CHANGELOG line per change, then rebuild and re-run detection to compare:\n` + res.changes.map((c) => `- stage ${c.stage}: ${c.from} -> ${c.to}`).join('\n') + `\nMeasured gap to target: ${num(b.loss * 100, 1)} pts before, ${num(a.loss * 100, 1)} pts after (verified on a fresh seed). Bots are not humans: a real playtest of the changed stages decides.`;
   const copied = h('span', { class: 'hint' });

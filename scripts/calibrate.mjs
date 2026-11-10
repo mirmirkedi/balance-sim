@@ -7,6 +7,7 @@
 //
 //   node calibrate.mjs --adapter A --targets T --out dir [--rounds 6] [--runs 60] [--retries 10] [--campaign]
 //                      [--personas smart] [--seed 21] [--k 0.8] [--base params.json] [--stages 1-40]
+//                      [--compose] [--swap-at 0.15]      also swap enemy types where the adapter declares levers.compose
 //
 // Adapter contract (optional export):
 //   levers: { stage: { param: 'TUNE.stage.adj.{stage}', mode: 'mul' | 'add', harder: +1 | -1,
@@ -38,6 +39,9 @@ fs.mkdirSync(path.join(out, 'rounds'), { recursive: true });
 const rounds = +arg('rounds', 6), runs = +arg('runs', 60), seed0 = +arg('seed', 21), K = +arg('k', 0.8), retries = arg('retries', '10');
 const mode = lever.mode || 'mul', harder = lever.harder ?? 1, step = lever.step ?? 8, dead = +arg('deadband', 0.04);
 const base = arg('base') && fs.existsSync(arg('base')) ? JSON.parse(fs.readFileSync(arg('base'), 'utf8')) : {};
+const comp = adapter.levers && adapter.levers.compose;
+if (has('compose') && !comp) console.error('[calib] --compose given but the adapter declares no levers.compose: only the numeric lever is used.');
+const useComp = !!comp && has('compose'), swapAt = +arg('swap-at', 0.15);
 const all = adapter.stages.map(String);
 let ids = all;
 const sel = arg('stages');
@@ -51,10 +55,30 @@ const vals = new Map(ids.map((s) => [s, baseline(s)]));
 // --base may hold lever values of an earlier candidate: continue FROM them (they are the starting point, not fixed extras)
 for (const s of ids) { const k = paramOf(s); if (k in base) { vals.set(s, +base[k]); delete base[k]; } }
 
+// ---- enemy composition (levers.compose) ----
+const parseRoster = (r) => { const o = {}; if (!r) return o; if (typeof r === 'string') { for (const part of r.split(',')) { const [k, n] = part.split(':'); if (k) o[k.trim()] = +n || 0; } } else for (const [k, n] of Object.entries(r)) o[k] = +n || 0; return o; };
+const rosterStr = (o) => (comp ? [...comp.types.map((t) => t.id), ...Object.keys(o).filter((k) => !comp.types.some((t) => t.id === k))] : []).filter((k) => o[k] > 0).map((k) => k + ':' + o[k]).join(',');
+const compParam = (s) => comp.param.replace('{stage}', s);
+const rosters = new Map(), rosters0 = new Map();
+if (comp) for (const s of ids) { const r0 = parseRoster(comp.read ? comp.read(s) : {}); rosters0.set(s, rosterStr(r0)); let r = { ...r0 }; const k = compParam(s); if (k in base) { r = parseRoster(base[k]); delete base[k]; } rosters.set(s, r); }
+const power = (id) => (comp.types.find((t) => t.id === id) || {}).power ?? 1;
+const protectedT = new Set((comp && comp.protect) || []);
+// best swap (1..3 units of A -> same number of B) whose power change is closest to the wanted one; null when none points the right way
+// (a swap pointing the wrong way, or overshooting the wanted change by more than 60%, is skipped: the numeric lever does the rest)
+function bestSwap(r, want) {
+  let best = null;
+  for (const A of Object.keys(r)) for (const B of comp.types.map((t) => t.id)) {
+    if (A === B || protectedT.has(A) || protectedT.has(B) || !(r[A] > 0)) continue;
+    for (let n = 1; n <= Math.min(3, r[A]); n++) { const d = n * (power(B) - power(A)); if (d * want <= 0 || Math.abs(d) > 1.6 * Math.abs(want)) continue; const err = Math.abs(d - want); if (!best || err < best.err) best = { A, B, n, err }; }
+  }
+  return best;
+}
+
 const run = (script, args) => execFileSync(process.execPath, [path.join(here, script), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28 });
 const paramsFrom = (vm) => {
   const p = { ...base };
   for (const [s, v] of vm) if (snap(v) !== snap(baseline(s))) p[paramOf(s)] = snap(v);
+  if (comp) for (const [s, r] of rosters) if (rosterStr(r) !== rosters0.get(s)) p[compParam(s)] = rosterStr(r);
   return p;
 };
 function measure(params, seed, nRuns, tag) {
@@ -88,6 +112,7 @@ const progress = { status: 'running', startedAt: new Date().toISOString(), lever
 const save = () => fs.writeFileSync(path.join(out, 'progress.json'), JSON.stringify(progress));
 save();
 
+if (useComp) console.log(`[calib] enemy swaps on (${comp.types.map((t) => t.id + ' power ' + t.power).join(', ')}); a stage is swapped when it is > ${Math.round(swapAt * 100)} pts off target`);
 console.log(`[calib] lever ${lever.param} (${mode}, ${harder > 0 ? 'bigger = harder' : 'bigger = easier'}), ${ids.length} stages, ${rounds} rounds x ${runs} runs, persona ${tp}`);
 let best = { loss: Infinity, params: paramsFrom(vals), round: 0 };
 for (let r = 1; r <= rounds; r++) {
@@ -103,6 +128,11 @@ for (let r = 1; r <= rounds; r++) {
     if (!vals.has(s) || st.win == null || st.target == null || st.n < 12) continue;
     const delta = st.win - st.target;               // > 0: easier than the target
     if (Math.abs(delta) < dead) continue;
+    if (useComp && Math.abs(delta) >= swapAt) {   // far off: change WHICH enemies, then let the numeric lever fine-tune next round
+      const r = rosters.get(s), total = Object.entries(r).reduce((a, [k, n]) => a + n * power(k), 0), want = total * (Math.exp(K * delta * harder) - 1);
+      const sw = bestSwap(r, want);
+      if (sw) { r[sw.A] -= sw.n; r[sw.B] = (r[sw.B] || 0) + sw.n; console.log(`[calib] stage ${s}: swap ${sw.n} ${sw.A} -> ${sw.B} (${delta > 0 ? 'too easy' : 'too hard'} by ${Math.round(Math.abs(delta) * 100)} pts)`); moved++; continue; }
+    }
     const v = vals.get(s);
     vals.set(s, clamp(mode === 'mul' ? v * Math.exp(K * delta * harder) : v + K * delta * step * harder));
     moved++;
@@ -117,6 +147,8 @@ console.log('[calib] verifying on a fresh seed (' + vRuns + ' runs per stage)');
 const before = measure({ ...base }, vSeed, vRuns, 'before (baseline)');
 const after = measure(best.params, vSeed, vRuns, `after (best = round ${best.round})`);
 const changes = Object.entries(best.params).filter(([k]) => !(k in base)).map(([k, v]) => {
+  const cs = comp && ids.find((x) => compParam(x) === k);
+  if (cs) return { stage: cs, param: k, kind: 'compose', from: rosters0.get(cs), to: v };
   const s = ids.find((x) => paramOf(x) === k);
   return { stage: s, param: k, from: s != null ? snap(baseline(s)) : null, to: v };
 });

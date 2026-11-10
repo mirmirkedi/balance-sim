@@ -275,3 +275,30 @@ test('genre knowledge base is well formed and target.mjs can start from a genre'
   assert.match(out, /source: /);
   assert.match(run('target.mjs', ['--list-genres']), /roguelike/);
 });
+
+test('calibrate --compose swaps enemy types and reports them as roster changes', () => {
+  const out = path.join(tmp, 'compose');
+  run('calibrate.mjs', ['--adapter', adapter('toy-wave'), '--targets', path.join(root, 'examples', 'toy-wave', 'targets.json'), '--out', out, '--rounds', '3', '--runs', '30', '--compose']);
+  const res = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8'));
+  const comp = res.changes.filter((c) => c.kind === 'compose');
+  assert.ok(comp.length > 0, 'at least one stage should get a different enemy mix');
+  for (const c of comp) {
+    const sum = (r) => r.split(',').reduce((a, p) => a + +p.split(':')[1], 0);
+    assert.equal(sum(c.from), sum(c.to), 'a swap keeps the number of enemies');
+    assert.notEqual(c.from, c.to);
+  }
+});
+
+test('runner counts chosen actions and --set ban.<option> removes one', () => {
+  const dir = path.join(tmp, 'ban');
+  run('runner.mjs', ['--adapter', adapter('toy-wave'), '--personas', 'smart', '--runs', '10', '--stages', '9', '--set', 'ban.heal=1', '--out', dir]);
+  const ends = fs.readFileSync(path.join(dir, 'smart.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'end');
+  assert.ok(ends.every((e) => e.acts && e.acts.shoot > 0 && !e.acts.heal));
+});
+
+test('options.mjs reports usage and the cost of removing each option', () => {
+  const out = JSON.parse(run('options.mjs', ['--adapter', adapter('toy-wave'), '--runs', '20', '--stages', '8-10', '--json']));
+  assert.deepEqual(out.options.map((o) => o.id).sort(), ['heal', 'shoot']);
+  const heal = out.options.find((o) => o.id === 'heal');
+  assert.ok(heal.share >= 0 && heal.share < 1 && typeof heal.delta === 'number');
+});

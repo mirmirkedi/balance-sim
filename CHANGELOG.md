@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+- **Enemy mix as a lever**: adapter `levers.compose` + `calibrate.mjs --compose` swap enemy types per stage ("2 grunts -> 2 archers") when a stage is far off target, then the numeric lever fine-tunes. Studio: "Also swap enemy types" checkbox, rosters shown in the changes table.
+- **Option balance**: `scripts/options.mjs` (usage share + ablation: win-rate change when one option is removed, verdicts DEAD / MANDATORY / DOMINANT / HARMFUL). Runner now counts chosen actions (`acts` on every `end` event) and supports `--set ban.<option>=1`.
+
 ## 0.3.0
 - **Game type first**: `references/genres.json` (per-genre notes, suggested shape, honest confidence, sources), a game type picker in the studio, `target.mjs --genre/--list-genres`, adapter `studio.genre`, and SKILL.md rules: ask about the game, consult the file, research the web when unsure, write findings back, never present an unsourced number as a standard.
 - **Conversation mode**: work by talking with the agent instead of the web app. `detect.mjs` (scores), `target.mjs` (dry-run target proposal, `--write` to save), `calibrate.mjs`; SKILL.md tells the agent to explain, give its own opinion, and agree the target with the user. Same numbers and same run folder as the studio (`scripts/model.mjs`, `scripts/project.mjs`).

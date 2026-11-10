@@ -1,6 +1,6 @@
 {
   "name": "balance-sim",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Game-independent balance simulator and studio (Claude Code skill): bot personas, difficulty detection, target curves, auto-calibration, web UI",
   "type": "module",
   "private": true,

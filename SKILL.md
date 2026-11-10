@@ -135,9 +135,23 @@ game: legalActions() step(a) isDone() result()          required
 adapter: policy | scoreAction | evaluate                 how smart plays
          actionRepeat idleAction                          real time
          newProfile afterStage shop snapshot              campaign
+         levers.stage / levers.compose / options          what calibration may change (see below)
 result(): {win, hpLeft, hpMax, time, deaths, income, resources}
 ```
 Always: fixed dt per step, no `Math.random()`, deterministic in `seed`, `clone()` reseeds its own random stream (otherwise the lookahead sees future rolls), emit events for everything that matters.
+
+## Enemy mix and option balance (beyond one number per stage)
+
+**Enemy composition.** A stage can be made harder by scaling enemy stats (`levers.stage`) OR by changing WHICH enemies appear ("level 12: two archers instead of two grunts"). Declare the second with `levers.compose`:
+```
+compose: { param: 'comp.{stage}',                 // gets "grunt:3,brute:1" as a string
+           types: [{id:'grunt', power:1}, {id:'archer', power:1.4}, {id:'brute', power:2.5}],   // power = relative threat of one unit
+           read: (stage) => ({grunt: 4}),         // roster the stage has now
+           protect: ['boss'] }                    // never swapped
+```
+`power` is the adapter author's estimate (hp x damage is a fine start; measure with `options.mjs` or a few runs if unsure). `calibrate.mjs --compose` (studio: "Also swap enemy types") replaces 1-3 units of a type with another when a stage is more than 15 pts off target, keeping the unit count, then the numeric lever fine-tunes. Use it when stat scaling alone feels wrong (enemies turning into sponges) or when the designer wants a stage to teach a new enemy. The result lists the new rosters ("grunt:4 -> grunt:2,archer:2"): show them to the user and ask before applying, like every other change. The adapter must build the stage from `params['comp.<stage>']` when present.
+
+**Option balance.** Stage difficulty does not tell whether the player's choices are balanced. Run `node scripts/options.mjs --adapter A [--stages 1-10] [--runs 60] [--persona smart]`: it counts how often each action/upgrade is chosen (the runner counts `action.option ?? action.type`) and re-runs the same seeds with ONE option removed (`--set ban.<option>=1`). Read: big negative effect = MANDATORY (game depends on it), rarely used and no effect = DEAD, one option taking >=60% of choices and costing the most when removed = DOMINANT, win rate rises without it = HARMFUL. Fix by buffing the weak option, not nerfing the strong one (global rule). Options outside `legalActions()` (a shop, upgrades) must read `params['ban.<id>']` themselves, and set `action.option` when one action type covers several options. Bots pick by their own policy: DOMINANT may only mean "dominant for this bot", say so and confirm with real play. The player's own growth curve (power per stage vs enemy power) is NOT checked yet: read `snap.power` in campaign logs by hand.
 
 ## Log format (JSONL per persona, one object per line)
 

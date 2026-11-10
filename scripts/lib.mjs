@@ -27,9 +27,17 @@ export function parseSet(argv) {
 export function playRun({ adapter, persona, stage, seed, params, opts, sink, profile, maxSteps }) {
   const rng = mulberry32(seed ^ 0x9e3779b9); // persona randomness, separate from the game's own RNG
   let step = 0, game = null, error = null, res;
+  const acts = {};   // how often each action (or option) was chosen: feeds scripts/options.mjs
   const emit = (type, e = {}) => sink({ ...e, type, step, t: game && game.time ? game.time() : step });
   try {
     game = adapter.create({ stage, seed, emit, params, profile });
+    // --set ban.<option>=1 removes that action (action.option, else action.type) from the player's choices, unless nothing else is left.
+    // The ablation test (options.mjs) uses it to measure what an option is worth. Clones used for lookahead are not filtered.
+    const banned = (a) => params && params['ban.' + (a.option ?? a.type)];
+    if (params && Object.keys(params).some((k) => k.startsWith('ban.')) && game.legalActions) {
+      const orig = game.legalActions.bind(game);
+      game.legalActions = () => { const l = orig(); const f = l.filter((a) => !banned(a)); return f.length ? f : l; };
+    }
     const every = adapter.actionRepeat || 1;
     let last = null;
     while (!game.isDone() && step < maxSteps) {
@@ -41,6 +49,7 @@ export function playRun({ adapter, persona, stage, seed, params, opts, sink, pro
         else if (adapter.idleAction !== undefined) game.step(adapter.idleAction);
         else break;
       } else game.step(a);
+      if (a != null && typeof a === 'object') { const k = a.option ?? a.type; if (k != null) acts[k] = (acts[k] || 0) + 1; }
       step++;
     }
     res = game.result();
@@ -49,7 +58,7 @@ export function playRun({ adapter, persona, stage, seed, params, opts, sink, pro
     error = String((err && err.stack) || err).split('\n').slice(0, 3).join(' | ');
     res = { win: false };
   }
-  return { res, steps: step, error };
+  return { res, steps: step, error, acts };
 }
 
 // one readable line per event, for --replay

@@ -43,6 +43,7 @@ async function loadAdapter() {
     const l = a.levers && a.levers.stage;
     info = {
       stages: a.stages.map(String), campaign: !!a.campaign, studio: a.studio || {}, hasOracle: !!a.oracle, hasEvaluate: !!a.evaluate,
+      compose: a.levers && a.levers.compose ? { types: a.levers.compose.types, protect: a.levers.compose.protect || [] } : null,
       levers: l ? { param: l.param, mode: l.mode || 'mul', harder: l.harder ?? 1, min: l.min ?? null, max: l.max ?? null, default: l.default ?? null, unit: l.unit || '', integer: !!l.integer } : null,
       leverValues: l ? Object.fromEntries(a.stages.map(String).map((s) => [s, l.read ? l.read(s) : l.default ?? null])) : null,
     };
@@ -83,7 +84,7 @@ async function startJob(kind, o) {
   const t = targets();
   if (t) writeJson(path.join(dir, 'targets.json'), t);
   const cand = o.useCandidate && cfg.candidate ? cfg.candidate.params : null;
-  const options = { personas: o.personas || cfg.personas, runs: +(o.runs || cfg.runs), retries: +(o.retries ?? cfg.retries), seed: +(o.seed || cfg.seed), stages: o.stages || null, campaign: info.campaign, params: cand || {}, rounds: +(o.rounds || 6), k: +(o.k || 0.8) };
+  const options = { personas: o.personas || cfg.personas, runs: +(o.runs || cfg.runs), retries: +(o.retries ?? cfg.retries), seed: +(o.seed || cfg.seed), stages: o.stages || null, campaign: info.campaign, params: cand || {}, rounds: +(o.rounds || 6), k: +(o.k || 0.8), compose: !!o.compose };
   const meta = { id, kind, status: 'running', startedAt: new Date().toISOString(), options };
   writeJson(path.join(dir, 'meta.json'), meta);
   fs.writeFileSync(path.join(dir, 'console.log'), '');
@@ -98,7 +99,7 @@ async function startJob(kind, o) {
       if (!t) { emitLine(j, 'Save a target first (Target tab).'); code = 1; }
       else {
         if (options.params && Object.keys(options.params).length) writeJson(path.join(dir, 'base.json'), options.params);
-        code = await step(j, 'calibrate.mjs', ['--adapter', adapterPath, '--targets', path.join(dir, 'targets.json'), '--out', dir, '--rounds', String(options.rounds), '--runs', String(options.runs), '--k', String(options.k), '--seed', String(options.seed + 20), '--retries', String(options.retries), ...(options.campaign ? ['--campaign'] : []), ...(options.stages ? ['--stages', options.stages] : []), ...(fs.existsSync(path.join(dir, 'base.json')) ? ['--base', path.join(dir, 'base.json')] : [])]);
+        code = await step(j, 'calibrate.mjs', ['--adapter', adapterPath, '--targets', path.join(dir, 'targets.json'), '--out', dir, '--rounds', String(options.rounds), '--runs', String(options.runs), '--k', String(options.k), '--seed', String(options.seed + 20), '--retries', String(options.retries), ...(options.campaign ? ['--campaign'] : []), ...(options.compose ? ['--compose'] : []), ...(options.stages ? ['--stages', options.stages] : []), ...(fs.existsSync(path.join(dir, 'base.json')) ? ['--base', path.join(dir, 'base.json')] : [])]);
       }
     }
     meta.status = j.stopped ? 'stopped' : code ? 'failed' : 'done';

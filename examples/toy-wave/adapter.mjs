@@ -2,6 +2,10 @@
 // Player shoots one enemy per turn (or drinks a potion), then every living enemy attacks.
 // Stage 5 and 10 end with a boss. Player power grows with the stage number.
 const NOOP = () => {};
+// enemy types: hp and attack multipliers; power = hp x atk is the relative threat the calibrator uses when it swaps types
+const KINDS = { grunt: { hp: 1, atk: 1 }, archer: { hp: 0.7, atk: 2 }, brute: { hp: 2, atk: 1.25 } };
+const defaultRoster = (stage) => ({ grunt: 2 + Math.floor(stage / 3) });
+const parseRoster = (str) => Object.fromEntries(String(str).split(',').filter(Boolean).map((p) => { const [k, n] = p.split(':'); return [k, +n]; }));
 // tiny stateless hash RNG: value depends only on (seed, rolls) so clone() stays exact
 function rollAt(seed, n) {
   let t = (seed * 7 + n * 2654435761) >>> 0;
@@ -19,6 +23,7 @@ class Toy {
     const s = {
       seed, rolls: 0, hp: hpMax, hpMax, dmg: Math.round(12 * (1 + 0.12 * (stage - 1)) * (P.playerDmg ?? 1)), potions: 2,
       eHp: (P.enemyHp ?? 1) * (P['stageMul.' + stage] ?? 1), eAtk: (P.enemyAtk ?? 1) * (P['stageMul.' + stage] ?? 1),
+      roster: P['comp.' + stage] != null ? parseRoster(P['comp.' + stage]) : defaultRoster(stage),
       wave: 0, waves: 2 + Math.floor(stage / 4), enemies: [], t: 0, coins: 0, done: false, win: false,
     };
     const g = new Toy(stage, NOOP, s);
@@ -29,8 +34,7 @@ class Toy {
   spawn() {
     const { stage } = this, s = this.s;
     const hp = Math.round(20 * (1 + 0.12 * (stage - 1)) * s.eHp), atk = 2.2 * (1 + 0.1 * (stage - 1)) * s.eAtk;
-    const count = 2 + Math.floor(stage / 3);
-    s.enemies = Array.from({ length: count }, () => ({ kind: 'grunt', hp, max: hp, atk, hits: 0 }));
+    s.enemies = Object.entries(s.roster).flatMap(([kind, n]) => Array.from({ length: n }, () => { const k = KINDS[kind], h = Math.round(hp * k.hp); return { kind, hp: h, max: h, atk: atk * k.atk, hits: 0 }; }));
     if (stage % 5 === 0 && s.wave === s.waves - 1) s.enemies.push({ kind: 'boss', hp: hp * 3, max: hp * 3, atk: atk * 2, hits: 0 });
   }
   time() { return this.s.t; }
@@ -84,7 +88,11 @@ export default {
   stages: Array.from({ length: 10 }, (_, i) => i + 1),
   // studio: defaults for the web app and the one number per stage that makes it harder (bigger = harder)
   studio: { genre: 'general', runs: 80, personas: ['random', 'novice', 'smart'] },
-  levers: { stage: { param: 'stageMul.{stage}', mode: 'mul', harder: 1, min: 0.4, max: 3, default: 1, unit: 'x' } },
+  levers: {
+    stage: { param: 'stageMul.{stage}', mode: 'mul', harder: 1, min: 0.4, max: 3, default: 1, unit: 'x' },
+    // optional: swap enemy TYPES per stage (calibrate.mjs --compose). power = hp x atk of one unit.
+    compose: { param: 'comp.{stage}', types: Object.entries(KINDS).map(([id, k]) => ({ id, power: +(k.hp * k.atk).toFixed(2) })), read: (stage) => defaultRoster(Number(stage)) },
+  },
   create({ stage, seed, emit, params }) { const g = Toy.init(stage, seed, params); g.emit = emit; return g; },
   // sensible human play: drink at low hp, otherwise kill the most dangerous enemy that dies fastest
   policy(game, acts) {

@@ -9,7 +9,7 @@
 //                   [--replay persona:stage:run]     re-simulate one run and print it as a timeline
 //
 // Log files: <out>/<persona>.jsonl, one JSON object per line.
-//   type "end"   : one per attempt (always written)  {win, hpLeft, hpMax, time, deaths, income, resources, timeout, steps, error}
+//   type "end"   : one per attempt (always written)  {win, hpLeft, hpMax, time, deaths, income, resources, timeout, steps, error, acts}
 //                  campaign mode adds: attempt, campaign:true, snap (adapter.snapshot(profile))
 //   type "stall" : campaign only, the player gave up on this stage after 1 + retries attempts
 //   other types  : game events from adapter emit() (only for the first --full runs per persona+stage)
@@ -90,7 +90,7 @@ for (const persona of personas) {
         const base = { run: r, seed, persona, stage };
         const sink = (e) => { if (r < fullRuns || e.type === 'end') lines.push(JSON.stringify({ ...base, ...e })); };
         const pr = playRun({ adapter, persona, stage, seed, params, opts, sink, profile: null, maxSteps });
-        sink({ type: 'end', step: pr.steps, t: pr.res.time ?? pr.steps, ...pr.res, steps: pr.steps, error: pr.error });
+        sink({ type: 'end', step: pr.steps, t: pr.res.time ?? pr.steps, ...pr.res, steps: pr.steps, error: pr.error, acts: pr.acts });
         flush(persona, stage, lines);
         total++;
       }
@@ -112,7 +112,7 @@ for (const persona of personas) {
           const won = !!pr.res.win;
           const hook = { profile, stage, result: pr.res, won, attempt, persona, rng: prng, opts, params, emit: (type, e = {}) => sink({ ...e, type, step: 0, t: pr.res.time ?? 0 }) };
           if (adapter.afterStage) adapter.afterStage(hook);   // rewards, progression (income of the finished attempt)
-          sink({ type: 'end', step: pr.steps, t: pr.res.time ?? pr.steps, ...pr.res, steps: pr.steps, error: pr.error, snap: adapter.snapshot ? adapter.snapshot(profile) : null });
+          sink({ type: 'end', step: pr.steps, t: pr.res.time ?? pr.steps, ...pr.res, steps: pr.steps, error: pr.error, acts: pr.acts, snap: adapter.snapshot ? adapter.snapshot(profile) : null });
           total++;
           if (won) { cleared = true; flush(persona, stage, lines); break; }
           if (attempt > retries) sink({ type: 'stall', step: pr.steps, t: pr.res.time ?? 0 });
