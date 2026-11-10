@@ -136,6 +136,8 @@ Put the state that matters in `before`/`after` (player hp, enemy hp, shots left)
 | `INCOME_LOW` / `INCOME_HIGH` | income off the `incomeCurve` | faucet size; every faucet needs a sink |
 | `RANDOM_WINS` | random bot wins > 25% | add real threat, cut budget, force a decision |
 | `NO_SKILL` | smart - random < 15 points (and smart < 95%) | choices must matter: counters, trade-offs |
+| `BOT_LOST` | smart and random both win < 10% | the bots cannot judge this stage; check with the oracle (solver) persona or a real playtest |
+| `oracle` persona | adapter has `oracle(game)` (exact solver) | puzzles: proves solvability and slack; runs once per stage |
 | `POLICY_GAP` | optimizer beats smart by > 20 points | smart policy is weak, or a dominant option exists |
 | `COINFLIP` | win 15-85% and most wins are near-miss | luck decides: reduce variance, add pity |
 | `BROKEN` | errors or > 20% timeouts | fix soft-locks first |

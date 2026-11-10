@@ -1,0 +1,6 @@
+{
+  "_note": "Starting guess for PR-14 (100 puzzle levels, move limit = shortest solution + 1). The optimizer bot stands in for a good human. Replace with the real intended first-try win rates once decided.",
+  "targetPersona": "optimizer",
+  "tolerance": 0.15,
+  "curve": { "start": 0.9, "end": 0.35, "shape": "linear" }
+}

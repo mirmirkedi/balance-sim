@@ -5,6 +5,7 @@
 //   adapter.policy(game, actions, rng)        OPTIONAL hand-written "sensible move" (best for most games)
 //   adapter.scoreAction(game, action)         OPTIONAL score per action, highest wins
 //   game.clone() + adapter.evaluate(game)     OPTIONAL lookahead (needed by `optimizer`)
+//   adapter.oracle(game)                      OPTIONAL exact solver line (persona `oracle`, puzzles)
 //
 // Mapping to the global balancing rule (novice / average / optimizer):
 //   novice -> novice, average -> smart, optimizer -> optimizer, random = floor / sanity check.
@@ -60,6 +61,12 @@ export const PERSONAS = {
     return rng() < (opts.noviceError ?? 0.25) ? pick(acts, rng) : smart(game, rng, adapter);
   },
   smart,
+  // the game's own exact solver, if the adapter has one: always plays the known best line (puzzles). It answers
+  // "is this level solvable within the limit, and how much slack does it leave" - the other personas show how hard that is.
+  oracle(game, rng, adapter) {
+    if (!adapter.oracle) throw new Error('persona oracle needs adapter.oracle(game) -> next action or null');
+    return adapter.oracle(game);
+  },
   // looks 2 moves ahead if the game can clone itself, otherwise same as smart
   optimizer(game, rng, adapter, opts) {
     const acts = game.legalActions();
@@ -68,6 +75,9 @@ export const PERSONAS = {
     return smart(game, rng, adapter);
   },
 };
+
+// a persona that always plays the same line needs one run per stage, not N
+PERSONAS.oracle.deterministic = true;
 
 // Helper for shop / upgrade / build-order decisions (campaign mode, adapter.shop()).
 // Same skill ladder as the in-fight personas, so spending quality differs per persona too:

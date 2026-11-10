@@ -17,7 +17,7 @@ const pct = (x) => x == null ? '-' : Math.round(x * 100) + '%';
 const num = (x, d) => x == null ? '-' : Number(x).toFixed(d || 0);
 const sgn = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x);
 const tp = D.tp, S = D.stages, n = S.length;
-const personaColor = (p) => ({ random: 'var(--c-random)', novice: 'var(--c-novice)', smart: 'var(--c-smart)', optimizer: 'var(--c-optimizer)' }[p] || 'var(--c-other)');
+const personaColor = (p) => ({ random: 'var(--c-random)', novice: 'var(--c-novice)', smart: 'var(--c-smart)', optimizer: 'var(--c-optimizer)', oracle: 'var(--c-oracle)' }[p] || 'var(--c-other)');
 
 // ---------- what every flag means (also the glossary) ----------
 const FLAGS = {
@@ -35,6 +35,7 @@ const FLAGS = {
   INCOME_LOW: ['warn', 'The player earns less here than the target, so the shop falls behind.', 'Raise the gold reward of this stage.'],
   INCOME_HIGH: ['warn', 'The player earns more here than the target, so money piles up.', 'Lower the gold reward or add a sink the player wants.'],
   RANDOM_WINS: ['warn', 'A random player wins often on a stage that should challenge.', 'Make bad choices cost more, or check the stage really needs the mechanic.'],
+  BOT_LOST: ['info', 'Both the smart and the random bot almost never win here, so this stage says nothing about skill: the bots are lost, not necessarily the stage.', 'Use an exact solver (oracle persona) to check it is solvable and how much slack the limit leaves, or a real playtest.'],
   NO_SKILL: ['warn', 'Smart and random players win about equally: skill barely matters here.', 'Add a decision that matters, or tighten the budget.'],
   POLICY_GAP: ['info', 'The optimizer wins much more than the smart bot: the smart policy may be weak, or the game has a hidden strong move.', 'Replay the optimizer and teach the smart policy that move.'],
   COINFLIP: ['warn', 'Wins are decided by a sliver of HP, which feels random.', 'Widen the margin: clearly winnable with good play, or clearly not.'],
@@ -243,7 +244,7 @@ function cell(c, st) {
     case 'reach': return h('td', null, pct(v));
     case 'time': case 'income': return h('td', null, num(v));
     case 'flags': return h('td', { class: 'fl' }, st.flags.map(flagEl));
-    default: return h('td', null, pct(v));
+    default: return h('td', v == null ? { title: 'no player of this persona reached this stage' } : null, pct(v));
   }
 }
 function table() {

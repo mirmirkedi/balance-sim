@@ -161,3 +161,24 @@ test('runner warns when a game is not deterministic for the same seed', () => {
   const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'runner.mjs'), '--adapter', bad, '--runs', '3', '--personas', 'smart', '--out', path.join(tmp, 'bad-logs')], { encoding: 'utf8' });
   assert.match(r.stderr, /NONDETERMINISTIC/);
 });
+
+test('oracle persona (adapter solver) runs once per stage and always plays the solver line', () => {
+  const ad = path.join(tmp, 'oracle-adapter.mjs');
+  fs.writeFileSync(ad, `export default { stages: [1, 2], oracle: (g) => g.legalActions()[0] ?? null,
+    create() { let n = 0; return { legalActions: () => (n < 3 ? [{ type: 'go' }] : []), step() { n++; }, isDone: () => n >= 3, result: () => ({ win: true, time: n }) }; } };`);
+  const dir = path.join(tmp, 'oracle-logs');
+  run('runner.mjs', ['--adapter', ad, '--runs', '7', '--personas', 'random,oracle', '--out', dir]);
+  assert.equal(ends(dir, 'oracle').length, 2);   // 2 stages x 1 run
+  assert.equal(ends(dir, 'random').length, 14);  // 2 stages x 7 runs
+});
+
+test('BOT_LOST replaces NO_SKILL when both bots almost never win', () => {
+  const dir = path.join(tmp, 'lost'), ad = path.join(tmp, 'hard-adapter.mjs');
+  fs.writeFileSync(ad, `export default { stages: [1], policy: (g) => g.legalActions()[0],
+    create() { let n = 0; return { legalActions: () => [{ type: 'a' }], step() { n++; }, isDone: () => n >= 5, result: () => ({ win: false, time: n }) }; } };`);
+  run('runner.mjs', ['--adapter', ad, '--runs', '30', '--personas', 'random,smart', '--out', dir]);
+  const rep = path.join(tmp, 'lost.json');
+  run('analyze.mjs', ['--logs', dir, '--out', rep]);
+  const fl = JSON.parse(fs.readFileSync(rep, 'utf8')).stages['1'].flags;
+  assert.ok(fl.includes('BOT_LOST') && !fl.includes('NO_SKILL'));
+});

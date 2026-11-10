@@ -81,10 +81,11 @@ let total = 0;
 const runIdxs = (n) => replay ? [replay.run] : Array.from({ length: n }, (_, i) => i);
 
 for (const persona of personas) {
+  if (!replay && personas.length > 1) console.error(`  ${persona} ... (${((Date.now() - t0) / 1000).toFixed(0)}s elapsed)`);
   if (!campaign) {
     for (const stage of stages) {
       const si = all.indexOf(stage);
-      for (const r of runIdxs(runs)) {
+      for (const r of runIdxs(PERSONAS[persona].deterministic ? 1 : runs)) {
         const seed = seedFor(seed0, si, r), lines = [];
         const base = { run: r, seed, persona, stage };
         const sink = (e) => { if (r < fullRuns || e.type === 'end') lines.push(JSON.stringify({ ...base, ...e })); };
@@ -95,7 +96,7 @@ for (const persona of personas) {
       }
     }
   } else {
-    for (const r of runIdxs(runs)) {
+    for (const r of runIdxs(PERSONAS[persona].deterministic ? 1 : runs)) {
       const prng = mulberry32(seedFor(seed0, 99991, r) ^ 0x51ed270b);   // shop / spending randomness
       let profile = adapter.newProfile ? adapter.newProfile({ seed: seedFor(seed0, 99991, r), params, startStage: stages[0] }) : null;
       for (const stage of stages) {

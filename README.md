@@ -26,7 +26,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
-npm test                                   # 15 end-to-end tests
+npm test                                   # 17 end-to-end tests
 ```
 
 Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
@@ -56,7 +56,7 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |
 | `scripts/personas.mjs`, `lib.mjs`, `rng.mjs` | personas (+ `chooseItem` for shops), shared run loop, seeded RNG |
 | `templates/` | adapter and target-curve templates |
-| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr15-html-vm` (a real single-HTML game run headless in a Node vm; set `PR15_GAME=/path/to/game.html`) |
+| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr14-puzzle` (real egg-nest puzzle with its own headless engine and exact solver, `oracle` persona), `pr15-html-vm` (a real single-HTML game run headless in a Node vm; set `PR15_GAME=/path/to/game.html`) |
 | `commands/balance.md` | the `/balance` slash command |
 | `test/` | end-to-end tests (`npm test`) |
 

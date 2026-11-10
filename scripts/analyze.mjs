@@ -21,7 +21,7 @@ const T = readJson(arg('targets'));
 // ---------- load ----------
 const ends = {};      // persona -> stage -> [end events]
 const events = {};    // stage -> persona -> [events]
-const personaOrder = ['random', 'novice', 'smart', 'optimizer'];
+const personaOrder = ['random', 'novice', 'smart', 'optimizer', 'oracle'];
 const stageOrder = [];
 for (const f of fs.readdirSync(logDir).filter((x) => x.endsWith('.jsonl'))) {
   const persona = f.replace('.jsonl', '');
@@ -134,7 +134,9 @@ stageOrder.forEach((s, i) => {
   const rnd = st.random, smart = st.smart || st[tp];
   // random winning is only a problem where the stage is meant to challenge (target <= 80%); tutorial stages are allowed to be trivial
   if (rnd && rnd.win > randomWinMax && (tg.win == null || tg.win <= 0.8)) f.push('RANDOM_WINS');
-  if (rnd && smart && smart.win - rnd.win < skillGapMin && smart.win < 0.95) f.push('NO_SKILL');
+  // when even the smart bot almost never wins, the gap to random says nothing about skill: the bot is lost, not the stage
+  if (rnd && smart && smart.win < 0.1 && rnd.win < 0.1) f.push('BOT_LOST');
+  else if (rnd && smart && smart.win - rnd.win < skillGapMin && smart.win < 0.95) f.push('NO_SKILL');
   if (st.optimizer && st.smart && st.optimizer.win - st.smart.win > policyGapMax) f.push('POLICY_GAP');
   if (me.win > 0.15 && me.win < 0.85 && me.n >= 20 && me.nearMiss > 0.5) f.push('COINFLIP');
   if (me.n < 20) f.push('LOW_N');
@@ -173,7 +175,7 @@ stageOrder.forEach((s, i) => {
 const byFlag = (k) => stageOrder.filter((s) => flags[s].includes(k));
 console.log('\nSummary');
 let anyBad = false;
-for (const k of ['BROKEN', 'TOO_HARD', 'TOO_EASY', '?HARD', '?EASY', 'WALL', 'SPIKE', 'DIP', 'SLOW', 'FAST', 'DEATHY', 'INCOME_LOW', 'INCOME_HIGH', 'RANDOM_WINS', 'NO_SKILL', 'POLICY_GAP', 'COINFLIP', 'LOW_N'])
+for (const k of ['BROKEN', 'TOO_HARD', 'TOO_EASY', '?HARD', '?EASY', 'WALL', 'SPIKE', 'DIP', 'SLOW', 'FAST', 'DEATHY', 'INCOME_LOW', 'INCOME_HIGH', 'RANDOM_WINS', 'NO_SKILL', 'BOT_LOST', 'POLICY_GAP', 'COINFLIP', 'LOW_N'])
   if (byFlag(k).length) { console.log('  ' + k.padEnd(12), byFlag(k).join(', ')); if (k !== 'LOW_N' && !k.startsWith('?')) anyBad = true; }
 if (!anyBad) console.log('  all stages inside the target band');
 if (stageOrder.some((s) => flags[s].some((x) => x.startsWith('?')))) console.log('  "?" = point estimate is outside the band but the 95% interval still touches it: run more (--runs) before changing numbers');
