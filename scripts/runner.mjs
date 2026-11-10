@@ -93,11 +93,12 @@ for (const persona of personas) {
           const seed = seedFor(seed0, si, r, attempt), lines = [];
           const base = { run: r, seed, persona, stage, attempt, campaign: true };
           const sink = (e) => { if (r < fullRuns || e.type === 'end' || e.type === 'stall') lines.push(JSON.stringify({ ...base, ...e })); };
+          // the player prepares BEFORE every attempt: spends what earlier attempts brought (persona skill matters here)
+          if (adapter.shop) adapter.shop({ profile, stage, attempt, persona, rng: prng, opts, params, emit: (type, e = {}) => sink({ ...e, type, step: 0, t: 0 }) });
           const pr = playRun({ adapter, persona, stage, seed, params, opts, sink, profile, maxSteps });
           const won = !!pr.res.win;
           const hook = { profile, stage, result: pr.res, won, attempt, persona, rng: prng, opts, params, emit: (type, e = {}) => sink({ ...e, type, step: 0, t: pr.res.time ?? 0 }) };
-          if (adapter.afterStage) adapter.afterStage(hook);   // rewards, progression
-          if (adapter.shop) adapter.shop(hook);               // spending decisions (persona skill matters here)
+          if (adapter.afterStage) adapter.afterStage(hook);   // rewards, progression (income of the finished attempt)
           sink({ type: 'end', step: pr.steps, t: pr.res.time ?? pr.steps, ...pr.res, steps: pr.steps, error: pr.error, snap: adapter.snapshot ? adapter.snapshot(profile) : null });
           total++;
           if (won) { cleared = true; flush(persona, stage, lines); break; }

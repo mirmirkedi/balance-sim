@@ -1,0 +1,8 @@
+{
+  "_note": "Starting guess for PR-15 (stage 1-40, every 5th stage is a boss). Replace with the team's real targets once decided.",
+  "targetPersona": "smart",
+  "tolerance": 0.15,
+  "curve": { "start": 0.95, "end": 0.6, "shape": "linear", "bossDrop": 0.15 },
+  "bosses": ["5", "10", "15", "20", "25", "30", "35", "40"],
+  "stallMax": 0.1
+}

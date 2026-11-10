@@ -10,6 +10,14 @@ The game only has to expose a small adapter, so it works for any mechanic.
 
 Scripts: `scripts/` next to this file (installed at `~/.claude/skills/balance-sim/`). Node 18+. Run tests: `npm test`.
 
+## Cost: run it on Haiku
+
+Running the simulations and reading the report is mechanical, so it should not burn the big model's tokens (the user asked for this).
+- If this session already runs on Haiku, just follow the workflow.
+- Otherwise delegate workflow steps 3, 5, 6, 7 (run, analyze, sweep, replay, humans calibration) to a subagent: `Agent` with `model: "haiku"` (Haiku 5.5, `claude-haiku-5-5`) and `effort: "medium"`. Give it the exact commands and paths and ask it to return only: the stage table, the Summary block, and the best sweep value. Never let raw JSONL logs or full reports flow back into the main conversation.
+- Keep on the main model: understanding a complicated game's code to write its adapter (step 2), choosing which number to change, and the plain-words report to the user. Filling the adapter template for a simple game can go to the Haiku subagent too.
+- One subagent per job (a baseline run, a sweep). Do not spawn one per persona or per stage.
+
 ## Workflow (in this order, never skip 1)
 
 1. **Target curve first.** Copy `templates/targets.template.json` into the game's `parameters/` and fill it.
@@ -44,7 +52,16 @@ Run the big validation (many runs, all stages, campaign) last, after content cha
 | idle, auto battler, merge board | `[]` (nothing to decide in a fight) | `advance()`, and put the skill in `shop()` / `afterStage()` in `--campaign` mode |
 | roguelike, RPG, economy | fight moves | `--campaign`: a profile with gold, gear, levels persists across stages |
 
-**Campaign mode** (`--campaign`): one simulated player walks the stages in order, keeps a `profile` (`newProfile`), earns (`afterStage`), spends (`shop`, persona skill matters via `chooseItem`), retries a lost stage up to `--retries` times and quits at a wall. The report then shows first-try win, tries per stage, `reach` (funnel), `bank` and `power` (from `snapshot`), and `WALL`. Use it whenever the economy or upgrades decide difficulty. Without it every stage is independent, so `create()` must set a realistic player strength for that stage.
+**Campaign mode** (`--campaign`): one simulated player walks the stages in order, keeps a `profile` (`newProfile`), earns (`afterStage`), prepares before EVERY attempt (`shop`: spends, equips, merges, levels; persona skill matters via `chooseItem`), retries a lost stage up to `--retries` times and quits at a wall. The report then shows first-try win, tries per stage, `reach` (funnel), `bank` and `power` (from `snapshot`), and `WALL`. Use it whenever the economy or upgrades decide difficulty. Without it every stage is independent, so `create()` must set a realistic player strength for that stage.
+
+## Games whose code is one HTML file (proven on PR-15)
+
+Do not click through the UI. Run the real shipped code headless, see `examples/pr15-html-vm/` (adapter.mjs + ctx.js):
+1. Read the game's `<script>` from `game.html`, drop the boot call (`init();`), run it with `vm.runInContext` in a context with a catch-all Proxy as `document`, stub `localStorage`, `setTimeout`, `requestAnimationFrame`.
+2. A second script, run in the same context (`ctx.js`), replaces every function that opens a screen (modals, toasts, reveal panels) with a pending decision, wraps the damage/kill/commit functions to `emit` events, and exposes a small `__api` (setup, tick, state, resolve, meta actions). Combat, drops and rewards keep running the original functions.
+3. Seed `Math.random` inside the context with the run seed; apply `--set TUNE.x.y=v` by writing into the game's own tuning object.
+4. The auto-combat part has no decisions, so the runner calls `advance()`; real decisions (gear, event choices, fight or run) come out as `legalActions()`; backpack/level/store play goes into `shop()` with `--campaign`.
+It took one adapter file plus one context file and runs ~3000 attempts in 6 seconds.
 
 ## Personas
 
