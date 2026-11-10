@@ -20,7 +20,8 @@ const sgn = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x);
 const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 const api = async (p, o) => {
   const init = o && o.body !== undefined ? { method: o.method || 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(o.body) } : (o || {});
-  const r = await fetch(p, init), t = await r.text();
+  let r, t;
+  try { r = await fetch(p, init); t = await r.text(); } catch (e) { throw new Error('Cannot reach the studio server, it may have stopped. Start it again in the game folder: node ~/.claude/skills/balance-sim/scripts/studio.mjs'); }
   let j; try { j = JSON.parse(t); } catch (e) { j = t; }
   if (!r.ok) throw new Error((j && j.error) || r.statusText);
   return j;
@@ -29,6 +30,20 @@ const personaColor = (p) => ({ random: 'var(--c-random)', novice: 'var(--c-novic
 const band = (d) => d < 20 ? 'Very easy' : d < 35 ? 'Easy' : d < 50 ? 'Moderate' : d < 65 ? 'Challenging' : d < 80 ? 'Hard' : 'Brutal';
 const FLAG_SEV = { BROKEN: 'bad', TOO_HARD: 'bad', TOO_EASY: 'bad', WALL: 'bad', SPIKE: 'bad', '?HARD': 'warn', '?EASY': 'warn', DIP: 'warn', SLOW: 'warn', DEATHY: 'warn', INCOME_LOW: 'warn', INCOME_HIGH: 'warn', RANDOM_WINS: 'warn', NO_SKILL: 'warn', COINFLIP: 'warn' };
 const flagEl = (f) => h('span', { class: 'flag ' + (FLAG_SEV[f] || 'info') }, f);
+
+// ---------- feedback: errors must never be silent ----------
+let toastTimer;
+function toast(msg, kind, sticky) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast ' + (kind || 'bad'); t.hidden = false;
+  clearTimeout(toastTimer); if (!sticky) toastTimer = setTimeout(() => { t.hidden = true; }, 8000);
+}
+window.addEventListener('unhandledrejection', (e) => toast(String(e.reason && e.reason.message || e.reason || 'Something failed')));
+window.addEventListener('error', (e) => toast('Script error: ' + e.message));
+function liveCard() {
+  const j = A.st && A.st.job; if (!j || j.status !== 'running') return null;
+  return h('div', { class: 'panel live' }, h('div', { class: 'row' }, h('span', { class: 'spin' }), h('b', { id: 'livehead' }, (j.kind === 'detect' ? 'Detection' : 'Calibration') + ' is running'), h('span', { class: 'grow' }), h('button', { class: 'ghost', onclick: () => toggleConsole(true) }, 'Full console'), h('button', { class: 'ghost danger', onclick: () => api('/api/jobs/' + j.id + '/stop', { body: {} }) }, 'Stop')), h('pre', { class: 'log', id: 'livelog' }, A.lines.slice(-8).join('\n') || 'starting\u2026'));
+}
+const updateLive = () => { const el = $('#livelog'); if (el) { el.textContent = A.lines.slice(-8).join('\n'); } };
 
 // ---------- state ----------
 const A = { st: null, tab: 'detect', det: null, selStage: null, T: null, Tdirty: false, calib: null, calibRunId: null, logRunId: null, logData: null, logTab: 'console', form: null, cform: { rounds: 6, runs: 60, k: 0.8, useCand: false }, lines: [], es: null, jobWas: null };
@@ -150,7 +165,7 @@ function watchJob(id) {
   if (A.es) A.es.close();
   A.lines = []; $('#console').textContent = ''; $('#dtitle').textContent = 'Console: ' + id;
   const es = A.es = new EventSource('/api/jobs/' + id + '/stream');
-  es.onmessage = (e) => { const l = JSON.parse(e.data); A.lines.push(l); const c = $('#console'); c.append(l + '\n'); c.scrollTop = c.scrollHeight; };
+  es.onmessage = (e) => { const l = JSON.parse(e.data); A.lines.push(l); const c = $('#console'); c.append(l + '\n'); c.scrollTop = c.scrollHeight; updateLive(); };
   es.addEventListener('done', () => { es.close(); });
 }
 function go(tab) { A.tab = tab; history.replaceState(null, '', '#' + tab); render(); }
@@ -190,17 +205,19 @@ function viewDetect(root) {
   if (st.config.candidate) box.append(h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: f.useCand, onchange: (e) => { f.useCand = e.target.checked; } }), `Use the active calibration candidate (${Object.keys(st.config.candidate.params).length} lever values) instead of the game as it is`));
   box.append(h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'primary', disabled: running, onclick: startDetect }, running ? 'A job is running…' : 'Run detection'), h('span', { class: 'hint' }, info.campaign ? 'Campaign game: one simulated player lives through all stages and keeps its gear.' : 'Every stage is played independently.')));
   root.append(box);
-  if (!A.det) { root.append(h('div', { class: 'panel empty' }, 'No detection run yet. Start one above, results appear here.')); return; }
+  const lc = liveCard(); if (lc) root.append(lc);
+  if (!A.det) { root.append(h('div', { class: 'panel empty' }, running ? 'Running\u2026 results appear here when it is done.' : 'No detection run yet. Start one above, results appear here.')); return; }
   detectResults(root, A.det);
 }
-async function startDetect() {
-  const f = A.form;
-  if (!f.personas.size) return alert('Pick at least one bot.');
+async function startDetect(ev) {
+  const f = A.form, btn = ev && ev.currentTarget;
+  if (!f.personas.size) return toast('Pick at least one bot.', 'warn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Starting\u2026'; }
   await api('/api/config', { body: { personas: [...f.personas], runs: f.runs, retries: f.retries, seed: f.seed } });
   try {
     const meta = await api('/api/jobs', { body: { kind: 'detect', personas: [...f.personas], runs: f.runs, retries: f.retries, seed: f.seed, stages: f.stages || null, useCandidate: f.useCand } });
     await afterStart(meta.id);
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Run detection'; } }
 }
 async function afterStart(id) { await refresh(); watchJob(id); toggleConsole(true); render(); }
 
@@ -438,6 +455,7 @@ function viewCalibrate(root) {
   if (A.st.config.candidate) box.append(h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: cf.useCand, onchange: (e) => { cf.useCand = e.target.checked; } }), 'Start from the active candidate'));
   box.append(h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'primary', disabled: running || !lv || !hasTarget, onclick: startCalib }, running ? 'A job is running…' : 'Run calibration'), h('span', { class: 'hint' }, `About ${cf.rounds + 2} measurements of ${info.stages.length} stages × ${cf.runs} runs.`)));
   root.append(box);
+  const lc2 = liveCard(); if (lc2) root.append(lc2);
   const out = h('div'); root.append(out);
   if (A.st.config.candidate) {
     const c = A.st.config.candidate;
@@ -446,9 +464,10 @@ function viewCalibrate(root) {
   if (A.calib) calibResults(out, A.calib);
   else out.append(h('div', { class: 'panel empty' }, 'No calibration run yet.'));
 }
-async function startCalib() {
-  const cf = A.cform;
-  try { const meta = await api('/api/jobs', { body: { kind: 'calibrate', rounds: cf.rounds, runs: cf.runs, k: cf.k, retries: A.form.retries, seed: A.form.seed, useCandidate: cf.useCand } }); A.calib = null; A.calibRunId = meta.id; await afterStart(meta.id); } catch (e) { alert(e.message); }
+async function startCalib(ev) {
+  const cf = A.cform, btn = ev && ev.currentTarget;
+  if (btn) { btn.disabled = true; btn.textContent = 'Starting\u2026'; }
+  try { const meta = await api('/api/jobs', { body: { kind: 'calibrate', rounds: cf.rounds, runs: cf.runs, k: cf.k, retries: A.form.retries, seed: A.form.seed, useCandidate: cf.useCand } }); A.calib = null; A.calibRunId = meta.id; await afterStart(meta.id); } catch (e) { toast(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Run calibration'; } }
 }
 function lossChart(rounds, total) {
   const w = 520, hgt = 140, pad = 34, mx = Math.max(10, ...rounds.map((r) => r.loss * 100)) * 1.1;
@@ -558,7 +577,8 @@ async function tick() {
       const done = A.jobWas; A.jobWas = null;
       if (done) { A.det = null; if (done.startsWith('calibrate')) { A.calib = null; A.calibRunId = done; } render(); }
     }
-  } catch (e) { /* server restarting */ }
+    if (A.offline) { A.offline = false; $('#toast').hidden = true; }
+  } catch (e) { if (!A.offline) { A.offline = true; toast('Lost the connection to the studio server. Is it still running? Start it again with: node ~/.claude/skills/balance-sim/scripts/studio.mjs', 'bad', true); } }
 }
 let theme = 'auto';
 try { theme = localStorage.getItem('bs-theme') || 'auto'; } catch (e) { /* blocked */ }
@@ -567,5 +587,5 @@ $('#theme').addEventListener('click', () => { theme = theme === 'auto' ? 'dark' 
 $('#dclose').addEventListener('click', () => toggleConsole(false));
 applyTheme();
 const h0 = location.hash.slice(1); if (TABS.some(([k]) => k === h0)) A.tab = h0;
-refresh().then(async () => { if (A.st.job && A.st.job.status === 'running') { A.jobWas = A.st.job.id; watchJob(A.st.job.id); } await render(); setInterval(tick, 2000); });
+refresh().catch((e) => { toast('Cannot reach the studio server: ' + e.message, 'bad', true); throw e; }).then(async () => { if (A.st.job && A.st.job.status === 'running') { A.jobWas = A.st.job.id; watchJob(A.st.job.id); } await render(); setInterval(tick, 2000); });
 })();
