@@ -73,6 +73,10 @@ ids.forEach((id, i) => {
   const mark = T.tags[id] ? ' [' + T.tags[id] + ']' : T.pins[id] != null ? ' [pinned]' : '';
   console.log(`${id.padEnd(6)} ${m == null ? '  -' : String(Math.round(m)).padStart(3)}  ${String(Math.round(tc[i])).padStart(5)}  ${d == null ? '     -' : ((d >= 0 ? '+' : '') + Math.round(d)).padStart(6)}   ${m == null ? ' '.repeat(10) : bar(m)} ${bar(tc[i])}${mark}`);
 });
+if (rep.onboarding) {
+  const early = ids.map((id, i) => [id, 1 - tc[i] / 100]).filter(([id, w]) => rep.onboarding.stages.includes(id) && w < rep.onboarding.smartMin);
+  if (early.length) console.log(`\nWARNING opening: stages ${early.map(([id, w]) => id + ' (' + Math.round(w * 100) + '% win)').join(', ')} are in the first ~${rep.onboarding.minutes} minutes but the target lets the reference bot win less than ${Math.round(rep.onboarding.smartMin * 100)}% of the time. The opening should be easy so that even weak players pass: raise the win target there (lower difficulty) unless the user wants a hard start.`);
+}
 const big = ids.map((id, i) => [id, measured[i] == null ? 0 : tc[i] - measured[i]]).filter(([, d]) => Math.abs(d) >= 12).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 console.log(`\nBIGGEST CHANGES: ${big.slice(0, 8).map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${Math.round(d)}`).join(', ') || 'none (target is close to the current game)'}`);
 if (P.has('write')) {

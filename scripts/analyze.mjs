@@ -109,6 +109,17 @@ for (const p of personas) { const s0 = stageOrder.find((s) => S[s][p]); firstN[p
 const reach = (s, p) => S[s][p] && firstN[p] ? S[s][p].n / firstN[p] : null;
 
 // ---------- verdicts ----------
+// ---------- onboarding window: the first minutes must be easy, even for players who play badly ----------
+// Design rule: in roughly the first 4 minutes of play even a weak player should pass at a high rate (novice bot >= 80% first try,
+// the target persona >= 90%). Override or switch off in targets.json: "onboarding": {"minutes":4,"minWin":0.8,"smartMin":0.9,"persona":"novice"} or false.
+const OB = T.onboarding === false ? null : { minutes: 4, minWin: 0.8, smartMin: 0.9, persona: personas.includes('novice') ? 'novice' : null, ...(T.onboarding || {}) };
+const obStages = [];
+if (OB) {
+  const total = stageOrder.reduce((a, s) => a + (S[s][tp]?.time || 0), 0);
+  let clock = 0;
+  for (const s of stageOrder) { if (total > 0 ? clock >= OB.minutes * 60 : obStages.length >= 3) break; obStages.push(s); clock += S[s][tp]?.time || 0; }
+  OB.windowStages = obStages; OB.timeKnown = total > 0;
+}
 const flags = {};
 const difficulty = stageOrder.map((s) => 1 - (S[s][tp]?.win ?? 0));
 stageOrder.forEach((s, i) => {
@@ -139,6 +150,10 @@ stageOrder.forEach((s, i) => {
   else if (rnd && smart && smart.win - rnd.win < skillGapMin && smart.win < 0.95) f.push('NO_SKILL');
   if (st.optimizer && st.smart && st.optimizer.win - st.smart.win > policyGapMax) f.push('POLICY_GAP');
   if (me.win > 0.15 && me.win < 0.85 && me.n >= 20 && me.nearMiss > 0.5) f.push('COINFLIP');
+  if (OB && obStages.includes(s)) {
+    const weak = OB.persona && st[OB.persona];
+    if (weak ? weak.hi < OB.minWin : me.hi < OB.smartMin) f.push('ONBOARDING_HARD');   // the whole 95% interval is below the bar
+  }
   if (me.n < 20) f.push('LOW_N');
 });
 
@@ -175,7 +190,7 @@ stageOrder.forEach((s, i) => {
 const byFlag = (k) => stageOrder.filter((s) => flags[s].includes(k));
 console.log('\nSummary');
 let anyBad = false;
-for (const k of ['BROKEN', 'TOO_HARD', 'TOO_EASY', '?HARD', '?EASY', 'WALL', 'SPIKE', 'DIP', 'SLOW', 'FAST', 'DEATHY', 'INCOME_LOW', 'INCOME_HIGH', 'RANDOM_WINS', 'NO_SKILL', 'BOT_LOST', 'POLICY_GAP', 'COINFLIP', 'LOW_N'])
+for (const k of ['BROKEN', 'TOO_HARD', 'TOO_EASY', '?HARD', '?EASY', 'WALL', 'SPIKE', 'DIP', 'SLOW', 'FAST', 'DEATHY', 'INCOME_LOW', 'INCOME_HIGH', 'RANDOM_WINS', 'NO_SKILL', 'BOT_LOST', 'POLICY_GAP', 'COINFLIP', 'ONBOARDING_HARD', 'LOW_N'])
   if (byFlag(k).length) { console.log('  ' + k.padEnd(12), byFlag(k).join(', ')); if (k !== 'LOW_N' && !k.startsWith('?')) anyBad = true; }
 if (!anyBad) console.log('  all stages inside the target band');
 if (stageOrder.some((s) => flags[s].some((x) => x.startsWith('?')))) console.log('  "?" = point estimate is outside the band but the 95% interval still touches it: run more (--runs) before changing numbers');
@@ -245,6 +260,7 @@ if (has('details') || has('stage')) details(arg('stage'));
 // ---------- report, compare, html ----------
 const report = {
   targetPersona: tp,
+  onboarding: OB ? { minutes: OB.minutes, minWin: OB.minWin, smartMin: OB.smartMin, persona: OB.persona, stages: obStages, timeKnown: OB.timeKnown } : null,
   stages: Object.fromEntries(stageOrder.map((s, i) => [s, { ...S[s], target: targetFor(s, i), flags: flags[s] }])),
 };
 if (arg('out')) fs.writeFileSync(arg('out'), JSON.stringify(report, null, 1));

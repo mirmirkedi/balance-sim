@@ -39,6 +39,7 @@ const FLAGS = {
   NO_SKILL: ['warn', 'Smart and random players win about equally: skill barely matters here.', 'Add a decision that matters, or tighten the budget.'],
   POLICY_GAP: ['info', 'The optimizer wins much more than the smart bot: the smart policy may be weak, or the game has a hidden strong move.', 'Replay the optimizer and teach the smart policy that move.'],
   COINFLIP: ['warn', 'Wins are decided by a sliver of HP, which feels random.', 'Widen the margin: clearly winnable with good play, or clearly not.'],
+  ONBOARDING_HARD: ['bad', 'This stage is in the first minutes of the game and even a weak player (novice bot) fails it too often.', 'Make the opening forgiving: lower enemy damage or health here, give more resources. New players leave if they fail early.'],
   LOW_N: ['info', 'Fewer than 20 players reached this stage, so the numbers are noisy.', 'Run more simulations, or raise --retries so more players get here.'],
 };
 const sev = (f) => FLAGS[f] ? FLAGS[f][0] : 'info';

@@ -372,3 +372,17 @@ test('survey: lists game data by system and flags what the logs cannot see', () 
   const out2 = JSON.parse(run('survey.mjs', ['--dir', proj, '--logs', bare, '--json']));
   assert.ok(out2.findings.some((f) => f.level === 'warn' && /INVISIBLE/.test(f.text)));
 });
+
+test('onboarding: a hard opening is flagged even when later stages are fine', () => {
+  const rep = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'report.json'), 'utf8'));
+  const go = (name, extra) => {
+    const logs = path.join(tmp, name);
+    run('runner.mjs', ['--adapter', adapter('toy-wave'), '--personas', 'novice,smart', '--runs', '40', '--stages', '1-8', ...extra, '--out', logs]);
+    run('analyze.mjs', ['--logs', logs, '--out', path.join(logs, 'report.json')]);
+    return rep(logs);
+  };
+  const hard = go('ob-hard', ['--set', 'stageMul.1=3.5', '--set', 'stageMul.2=3.5']);
+  assert.ok(hard.onboarding && hard.onboarding.stages.includes('1') && hard.onboarding.persona === 'novice');
+  assert.ok(hard.stages['1'].flags.includes('ONBOARDING_HARD'));
+  assert.ok(!go('ob-ok', []).stages['1'].flags.includes('ONBOARDING_HARD'));
+});

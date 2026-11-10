@@ -28,7 +28,7 @@ const api = async (p, o) => {
 };
 const personaColor = (p) => ({ random: 'var(--c-random)', novice: 'var(--c-novice)', smart: 'var(--c-smart)', optimizer: 'var(--c-optimizer)', oracle: 'var(--c-oracle)' }[p] || 'var(--c-other)');
 const band = M.band;
-const FLAG_SEV = { BROKEN: 'bad', TOO_HARD: 'bad', TOO_EASY: 'bad', WALL: 'bad', SPIKE: 'bad', '?HARD': 'warn', '?EASY': 'warn', DIP: 'warn', SLOW: 'warn', DEATHY: 'warn', INCOME_LOW: 'warn', INCOME_HIGH: 'warn', RANDOM_WINS: 'warn', NO_SKILL: 'warn', COINFLIP: 'warn' };
+const FLAG_SEV = { BROKEN: 'bad', TOO_HARD: 'bad', TOO_EASY: 'bad', WALL: 'bad', SPIKE: 'bad', '?HARD': 'warn', '?EASY': 'warn', DIP: 'warn', SLOW: 'warn', DEATHY: 'warn', INCOME_LOW: 'warn', INCOME_HIGH: 'warn', RANDOM_WINS: 'warn', NO_SKILL: 'warn', COINFLIP: 'warn', ONBOARDING_HARD: 'bad' };
 const flagEl = (f) => h('span', { class: 'flag ' + (FLAG_SEV[f] || 'info') }, f);
 
 // ---------- feedback: errors must never be silent ----------

@@ -14,7 +14,8 @@
       "Sudden difficulty spikes are named as a top cause of mid-game churn.",
       "Designers misjudge their own levels (they played them many times): measure fresh players or bots and look where attempts pile up and where players quit.",
       "Players improve at different speeds, one curve never fits everyone: decide the audience first (casual, mid-core, hardcore).",
-      "Hand-authored difficulty plus playtesting plus curve fitting is the usual route; difficulty is hard to quantify."
+      "Hand-authored difficulty plus playtesting plus curve fitting is the usual route; difficulty is hard to quantify.",
+      "Design rule of this tool (a house rule, not from a source): the first 3-4 minutes should be easy, since new players may play badly; even weak players should pass at a high rate. analyze.mjs checks it (ONBOARDING_HARD)."
     ],
     "suggest": { "template": "waves", "start": 8, "end": 55, "area": 10, "wave": 16, "bossBump": 12 },
     "sources": [

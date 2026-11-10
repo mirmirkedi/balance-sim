@@ -210,6 +210,7 @@ Put the state that matters in `before`/`after` (player hp, enemy hp, shots left)
 | `oracle` persona | adapter has `oracle(game)` (exact solver) | puzzles: proves solvability and slack; runs once per stage |
 | `POLICY_GAP` | optimizer beats smart by > 20 points | smart policy is weak, or a dominant option exists |
 | `COINFLIP` | win 15-85% and most wins are near-miss | luck decides: reduce variance, add pity |
+| `ONBOARDING_HARD` | stage is inside the opening window (first ~4 min of play) and even the novice bot's whole 95% interval is below 80% | make the opening forgiving (see "Balancing rules") |
 | `BROKEN` | errors or > 20% timeouts | fix soft-locks first |
 | `LOW_N` | fewer than 20 runs | `--runs` |
 
@@ -220,6 +221,7 @@ Also: cliff shape (all 100% then 0%: the ramp is a staircase), `tries` (>3 on a 
 - All numbers live in small JSON files; the adapter reads the same files as the game.
 - Change one variable at a time, re-run, then the next (that is `sweep.mjs`).
 - Buff weak options instead of nerfing strong ones. Add pity to random drops. Every faucet needs a sink.
+- **The opening must be easy.** In roughly the first 3-4 minutes of play the game should be easy, because new players may play badly: even a weak player should pass at a high rate (novice bot >= 80% first try, the target bot >= 90%). `analyze.mjs` finds the window from the target bot's play time per stage (the first 3 stages when the logs carry no time) and flags `ONBOARDING_HARD`; `detect.mjs` prints an OPENING line; `target.mjs` warns when the target itself makes the opening hard. Run the `novice` persona so the check has a weak player (without it only the target bot is checked). Override in targets.json: `"onboarding": {"minutes": 4, "minWin": 0.8, "smartMin": 0.9}` or `false` for a game that wants a hard start. Never lower this bar silently: if the user's target contradicts it, say so and ask.
 - Real playtest or telemetry overrides the bot. Say so in every report.
 
 ## Lessons from tuning PR-15 (read before a real game)

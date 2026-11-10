@@ -18,6 +18,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
 - **Personas** `random`, `novice`, `smart`, `optimizer` (2-move lookahead) and `oracle` (the game's exact solver, for puzzles). The gaps between them show skill depth, mistake cost and weak policies.
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
+- **Easy opening check.** The first ~4 minutes of play must be forgiving: even the weak (novice) bot should pass at a high rate, otherwise the stage is flagged `ONBOARDING_HARD` and `target.mjs` warns if the target makes the start hard.
 - **Survey first** (`survey.mjs`): lists the game's JSON data by system (drops, economy, combat, progression ...) and checks what the bots actually experienced: kills without drops, items never seen, money earned and never spent, and event types missing from the logs, so a system the simulation cannot see (like a loot table that never drops) is found before anyone tunes the wrong thing.
 - **Several levers, not one number.** Per stage it can scale a stat (`levers.stage`), swap the stage's content types (enemies, tile types, obstacles: `levers.compose`, `--compose`, with a `valid()` veto for unsolvable puzzles) or use another declared lever (`--lever player`). It skips stages that are only noise, and warns when one lever is pushed far (a x20 multiplier means the cause is elsewhere).
 - **Option balance** (`options.mjs`): how often each action or upgrade is chosen and how much the win rate drops without it: dead, mandatory, dominant options.
@@ -56,7 +57,7 @@ Bots are not humans: the scores describe the bots. A real playtest of the change
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
-npm test                                   # 30 end-to-end tests
+npm test                                   # 31 end-to-end tests
 ```
 
 Then in Claude Code, in the game's folder: `/balance-studio`, or just say "balance this game" / "balance layalım" (Claude asks whether to use this skill).
