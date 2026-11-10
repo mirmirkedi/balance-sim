@@ -13,8 +13,8 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 ## What it does
 
 - **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
-- **Personas** `random`, `novice`, `smart`, `optimizer`. The gaps between them show skill depth, mistake cost and weak policies.
-- **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
+- **Personas** `random`, `novice`, `smart`, `optimizer` (2-move lookahead) and `oracle` (the game's exact solver, for puzzles). The gaps between them show skill depth, mistake cost and weak policies.
+- **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
 - **Sweep** one parameter over several values and pick the best (`sweep.mjs`).
 - **Agentic tuning** (`tune.mjs`): the agent proposes parameter sets, the script measures them (loss, remaining flags, per-stage deltas, history); the agent interprets and iterates.
 - **Replay** any single run as a timeline (`--replay smart:7:12`).
@@ -62,4 +62,8 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 
 ## Status
 
-Tested on three toy mechanics and one real game (PR-15, headless via `vm`; tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md). Bots are not humans: real playtests override the report.
+Tested on three toy mechanics and two real games:
+- **PR-15** (single-HTML idle RPG, headless via `vm`): tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md.
+- **PR-14** (egg-nest tile puzzle, headless engine + exact solver): baseline measured, all 100 levels proven solvable, bots lose from level 11 on; not tuned yet because the intended difficulty is undecided.
+
+Known gaps: bots are not humans and are not calibrated to real players (use `--humans`); target curves in the examples are guesses; the `smart` policy of each game is simple; there is no LLM-played persona yet; a long run (3000+ runs with `optimizer`/`oracle`) takes tens of minutes. Real playtests override the report.
