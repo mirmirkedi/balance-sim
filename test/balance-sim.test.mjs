@@ -222,3 +222,35 @@ test('calibrate refuses politely when the adapter declares no lever', () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /no levers\.stage/);
 });
+
+test('model: average difficulty is kept exactly and the spread decides where the change lands', async () => {
+  const M = await import(pathToFileURL(path.join(root, 'scripts', 'model.mjs')).href);
+  const ids = Array.from({ length: 20 }, (_, i) => String(i + 1)), measured = ids.map((_, i) => 10 + i * 2);
+  const T = { ...M.defaultT(), template: 'measured', snapshot: measured, average: 40 };
+  const eq = M.targetCurve({ ...T, spread: 'equal' }, ids, measured), later = M.targetCurve({ ...T, spread: 'later' }, ids, measured);
+  assert.ok(Math.abs(M.mean(eq) - 40) < 0.5 && Math.abs(M.mean(later) - 40) < 0.5);
+  assert.ok(later[0] < eq[0] && later[19] > eq[19]);                       // later = early stages move less, last stages more
+  const keep = M.targetCurve({ ...M.defaultT(), template: 'measured', snapshot: measured }, ids, measured);
+  assert.ok(keep.every((v, i) => Math.abs(v - measured[i]) < 1e-9));       // "keep current" equals the measurement
+  const j = M.targetsJson(T, ids, measured, {});
+  assert.equal(Object.keys(j.stages).length, 20);
+  assert.ok(Math.abs(j.stages['1'].firstTryWin - (1 - eq[0] / 100)) < 0.001);
+});
+
+test('conversation mode: detect.mjs prints scores, target.mjs is a dry run until --write', () => {
+  const proj = path.join(tmp, 'conv-proj');
+  fs.mkdirSync(proj, { recursive: true });
+  const common = ['--dir', proj, '--adapter', adapter('toy-wave'), '--targets', path.join(proj, 'targets.json')];
+  const det = run('detect.mjs', [...common, '--runs', '30']);
+  assert.match(det, /AVERAGE DIFFICULTY/);
+  assert.match(det, /WORTH A LOOK/);
+  const dry = run('target.mjs', [...common, '--shift', '+10', '--spread', 'later', '--tag', '3=boss']);
+  assert.match(dry, /DRY RUN/);
+  assert.ok(!fs.existsSync(path.join(proj, 'targets.json')));
+  const wr = run('target.mjs', [...common, '--shift', '+10', '--write']);
+  assert.match(wr, /WRITTEN/);
+  const t = JSON.parse(fs.readFileSync(path.join(proj, 'targets.json'), 'utf8'));
+  assert.ok(t.studio && Object.keys(t.stages).length === 10);
+  const runs = fs.readdirSync(path.join(proj, '.balance-sim', 'runs'));
+  assert.ok(runs.some((d) => d.startsWith('detect-')));                      // same run folder as the web studio
+});

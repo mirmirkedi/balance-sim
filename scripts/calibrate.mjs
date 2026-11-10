@@ -76,6 +76,12 @@ function measure(params, seed, nRuns, tag) {
   return { loss, flagged, stages };
 }
 
+// when run by hand inside <game>/.balance-sim/runs/<id>/ (conversation mode) register the run like the studio does
+const metaPath = path.join(out, 'meta.json'), registered = /[\\/]\.balance-sim[\\/]runs[\\/]/.test(out) && !fs.existsSync(metaPath);
+if (registered) {
+  fs.writeFileSync(metaPath, JSON.stringify({ id: path.basename(out), kind: 'calibrate', status: 'running', startedAt: new Date().toISOString(), options: { personas: [tp], runs, retries: +retries, seed: seed0 - 20, stages: sel || null, campaign: has('campaign'), params: base, rounds, k: K, via: 'calibrate.mjs' } }, null, 2) + '\n');
+  if (!fs.existsSync(path.join(out, 'targets.json'))) fs.copyFileSync(arg('targets'), path.join(out, 'targets.json'));
+}
 const progress = { status: 'running', startedAt: new Date().toISOString(), lever: { param: lever.param, mode, harder, unit: lever.unit || '' }, targetPersona: tp, rounds: [], total: rounds };
 const save = () => fs.writeFileSync(path.join(out, 'progress.json'), JSON.stringify(progress));
 save();
@@ -115,4 +121,5 @@ const changes = Object.entries(best.params).filter(([k]) => !(k in base)).map(([
 const result = { status: 'done', targetPersona: tp, lever: progress.lever, bestRound: best.round, before, after, params: best.params, changes, rounds: progress.rounds, runs, verifyRuns: vRuns, finishedAt: new Date().toISOString() };
 fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify(result, null, 1));
 progress.status = 'done'; save();
+if (registered) { const m = JSON.parse(fs.readFileSync(metaPath, 'utf8')); m.status = 'done'; m.endedAt = new Date().toISOString(); m.summary = { before: Math.round(before.loss * 1000) / 10, after: Math.round(after.loss * 1000) / 10, changed: changes.length }; fs.writeFileSync(metaPath, JSON.stringify(m, null, 2) + '\n'); }
 console.log(`[calib] done: ${(before.loss * 100).toFixed(1)} -> ${(after.loss * 100).toFixed(1)} pts, ${changes.length} levers changed`);

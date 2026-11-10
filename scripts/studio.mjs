@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, exec } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { detectSummary } from './model.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -112,13 +113,7 @@ async function startJob(kind, o) {
 }
 function summarize(id, kind) {
   const dir = runDir(id);
-  if (kind === 'detect') {
-    const rep = readJson(path.join(dir, 'report.json'), null);
-    if (!rep) return null;
-    const tp = rep.targetPersona, ws = Object.values(rep.stages).map((s) => s[tp] && s[tp].win).filter((x) => x != null);
-    const gaps = Object.values(rep.stages).filter((s) => s[tp] && s.target && s.target.win != null).map((s) => Math.abs(s[tp].win - s.target.win));
-    return { tp, stages: ws.length, avgDifficulty: ws.length ? Math.round(100 * (1 - ws.reduce((a, b) => a + b, 0) / ws.length)) : null, gap: gaps.length ? Math.round(100 * gaps.reduce((a, b) => a + b, 0) / gaps.length * 10) / 10 : null };
-  }
+  if (kind === 'detect') { const rep = readJson(path.join(dir, 'report.json'), null); return rep ? detectSummary(rep) : null; }
   const res = readJson(path.join(dir, 'result.json'), null);
   return res ? { before: Math.round(res.before.loss * 1000) / 10, after: Math.round(res.after.loss * 1000) / 10, changed: res.changes.length } : null;
 }
@@ -165,6 +160,7 @@ const server = http.createServer(async (req, res) => {
       const f = p === '/' ? 'app.html' : p.slice(1);
       return send(res, 200, fs.readFileSync(path.join(web, f)), MIME[path.extname(f)]);
     }
+    if (req.method === 'GET' && p === '/model.mjs') return send(res, 200, fs.readFileSync(path.join(here, 'model.mjs')), MIME['.js']);
     if (p === '/api/state') return send(res, 200, { project: path.basename(projectDir), dir: projectDir, adapter: show(adapterPath), targetsFile: show(targetsPath), info, infoError, config: config(), targets: targets(), runs: listRuns(), job: job ? { id: job.id, kind: job.kind, status: job.status } : null });
     if (p === '/api/reload' && req.method === 'POST') { await loadAdapter(); return send(res, 200, { ok: !infoError, error: infoError }); }
     if (p === '/api/config' && req.method === 'POST') { const b = await body(req); const c = { ...config(), ...b }; writeJson(cfgPath, c); return send(res, 200, c); }

@@ -19,6 +19,19 @@ Order of work with the user: (1) **you write the connector first** (`tools/balan
 4. **Runs and logs:** console, attempt log with replay, settings and the full report of every run (state in `<game>/.balance-sim/`).
 The studio never edits game files. Applying calibrated values to the game's data is the agent's job (copy the prompt). Optional adapter exports it reads: `campaign: true`, `studio: { runs, retries, personas }`, `levers: { stage: { param: 'TUNE.stage.adj.{stage}', mode: 'mul' | 'add', harder: 1 | -1, min, max, default, step, integer, unit, read(stageId) } }` (see `examples/pr15-html-vm`, `examples/pr14-puzzle`). Without `levers` Detect and Target still work; tune with the agentic loop below.
 
+## Conversation mode: talk it through, no web app
+
+Use it when the user says they want to do it by talking ("elle", "konuşarak", "web açma", "sen anlat, ben karar vereyim") or does not want a browser. You are the user's balance partner: you measure, explain, give an OPINION, propose, agree, then act. Same workflow and same numbers as the studio (`scripts/model.mjs`), runs land in the same `.balance-sim/runs/` folder, so the user can open the studio later and see everything.
+
+1. **Connector first** (adapter, as always).
+2. **Detect:** `node ~/.claude/skills/balance-sim/scripts/detect.mjs` in the game folder (flags: `--runs`, `--retries`, `--personas`, `--stages`, `--adapter`). Prints the average difficulty, ramp, spikes, frustration, boredom, skill and a per-stage table.
+3. **Explain in plain words, in the user's language:** what the average means for a player, the shape of the curve, the 3-5 stages that matter and why, what the bots cannot tell. Short, with numbers.
+4. **Give your opinion, not only data.** Say what YOU would do and why ("Bence stage 12-14 tek seferde sıçrıyor, 12'yi 8 puan indirip 15'i 6 artırırdım, çünkü..."), offer 2-3 options with a recommendation, then ASK what they think ("senin fikrin ne?"). Ask about the intended audience and goal if unknown (casual or hardcore, retries, lives, hints). Never choose the target alone.
+5. **Preview the target:** `node ~/.claude/skills/balance-sim/scripts/target.mjs --shift +10 --spread later --tag 12=easier,25=boss` (also `--template`, `--average`, `--pin`, `--bosses`, `--tolerance`). It starts from the measured curve and is a DRY RUN until `--write`. Show the user the average before/after and the biggest changes, adjust until they agree, then run it again with `--write`.
+6. **Calibrate:** `node ~/.claude/skills/balance-sim/scripts/calibrate.mjs --adapter A --targets T --out <game>/.balance-sim/runs/calibrate-<name> --rounds 6 --runs 60 [--campaign --retries 10]` (needs `levers.stage`). Read the result with the user: before/after gap, which stages moved, what a number cannot fix (then propose structural changes).
+7. **Apply to the game data** one stage at a time with a CHANGELOG line (ask first), rebuild, then run `detect.mjs` again as the CHECK (not a restart) and compare with the earlier run. If it is off, adjust the target or calibrate again.
+Rules: confirm before writing a target or editing game files; say when numbers are uncertain (few players, bots are not humans); always show the average difficulty before and after; keep each message short. If the user later wants to click around, start the studio.
+
 ## Cost: run it on Haiku
 
 Running the simulations and reading the report is mechanical, so it should not burn the big model's tokens (the user asked for this).

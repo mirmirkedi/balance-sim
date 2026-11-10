@@ -40,12 +40,17 @@ You do not write any code. You talk to Claude Code in the game's folder:
 
 Bots are not humans: the scores describe the bots. A real playtest of the changed stages decides.
 
+## Two ways to work
+
+- **Web studio** (click): `/balance-studio`, four steps in the browser (above).
+- **Conversation mode** (talk): tell Claude "elle yapalım" / "let's do it by talking". Claude measures with `detect.mjs`, explains the result in plain words, gives its own opinion ("I would ease 12 by 8 and raise 15 by 6, because..."), asks yours, previews the target with `target.mjs` (a dry run until you agree), calibrates with `calibrate.mjs`, applies the change to your game data and measures again. Same numbers and same run folder as the studio, so you can open the web app any time and see the whole history.
+
 ## Install
 
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
-npm test                                   # 19 end-to-end tests
+npm test                                   # 21 end-to-end tests
 ```
 
 Then in Claude Code, in the game's folder: `/balance-studio`, or just say "balance this game" / "balance layalım" (Claude asks whether to use this skill).
@@ -88,6 +93,8 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/runner.mjs` | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
 | `scripts/report/` | template, css and js of the interactive HTML report |
 | `scripts/studio.mjs`, `scripts/studio/` | the web app: local server + single page app (detect, target, calibrate, logs) |
+| `scripts/detect.mjs`, `scripts/target.mjs` | conversation mode: measure with scores, preview and write a target from the command line |
+| `scripts/model.mjs`, `scripts/project.mjs` | shared scores and target model (web and command line use the same numbers), run folder helpers |
 | `scripts/calibrate.mjs` | moves per-stage levers until the measured curve meets the target (used by the studio, also a CLI) |
 | `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |

@@ -1,3 +1,4 @@
+import * as M from '/model.mjs';
 (function () {
 'use strict';
 // ---------- helpers ----------
@@ -13,11 +14,10 @@ const h = (tag, attrs, ...kids) => {
   for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
   return e;
 };
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const { clamp, mean } = M;
 const pct = (x) => x == null ? '-' : Math.round(x * 100) + '%';
 const num = (x, d) => x == null ? '-' : Number(x).toFixed(d || 0);
 const sgn = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x);
-const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 const api = async (p, o) => {
   const init = o && o.body !== undefined ? { method: o.method || 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(o.body) } : (o || {});
   let r, t;
@@ -27,7 +27,7 @@ const api = async (p, o) => {
   return j;
 };
 const personaColor = (p) => ({ random: 'var(--c-random)', novice: 'var(--c-novice)', smart: 'var(--c-smart)', optimizer: 'var(--c-optimizer)', oracle: 'var(--c-oracle)' }[p] || 'var(--c-other)');
-const band = (d) => d < 20 ? 'Very easy' : d < 35 ? 'Easy' : d < 50 ? 'Moderate' : d < 65 ? 'Challenging' : d < 80 ? 'Hard' : 'Brutal';
+const band = M.band;
 const FLAG_SEV = { BROKEN: 'bad', TOO_HARD: 'bad', TOO_EASY: 'bad', WALL: 'bad', SPIKE: 'bad', '?HARD': 'warn', '?EASY': 'warn', DIP: 'warn', SLOW: 'warn', DEATHY: 'warn', INCOME_LOW: 'warn', INCOME_HIGH: 'warn', RANDOM_WINS: 'warn', NO_SKILL: 'warn', COINFLIP: 'warn' };
 const flagEl = (f) => h('span', { class: 'flag ' + (FLAG_SEV[f] || 'info') }, f);
 
@@ -49,39 +49,8 @@ const updateLive = () => { const el = $('#livelog'); if (el) { el.textContent = 
 const A = { st: null, tab: 'detect', det: null, selStage: null, T: null, Tdirty: false, calib: null, calibRunId: null, logRunId: null, logData: null, logTab: 'console', form: null, cform: { rounds: 6, runs: 60, k: 0.8, useCand: false }, lines: [], es: null, jobWas: null };
 const TABS = [['detect', 'Detect'], ['target', 'Target'], ['calibrate', 'Calibrate'], ['logs', 'Runs & logs']];
 
-// ---------- scores (all derived from one detection report) ----------
-function scores(rep) {
-  const tp = rep.targetPersona, ids = Object.keys(rep.stages), out = [];
-  ids.forEach((id, i) => {
-    const st = rep.stages[id], me = st[tp], rnd = st.random;
-    if (!me) { out.push({ id, idx: i, empty: true, flags: st.flags || [] }); return; }
-    const win = me.win, tries = me.tries ?? me.attempts ?? 1, stall = me.stall || 0;
-    out.push({
-      id, idx: i, win, lo: me.lo, hi: me.hi, n: me.n, tries, stall, flags: (st.flags || []).filter((f) => f !== 'LOW_N'), lowN: (st.flags || []).includes('LOW_N'),
-      difficulty: 100 * (1 - win),
-      frustration: clamp(100 * (0.6 * stall + 0.4 * Math.min(1, (tries - 1) / 4)), 0, 100),
-      boredom: clamp(100 * (0.7 * clamp((win - 0.85) / 0.15, 0, 1) + 0.3 * (rnd ? rnd.win : 0)), 0, 100),
-      skill: rnd ? 100 * (win - rnd.win) : null,
-      conf: 100 * (me.hi - me.lo) / 2,
-      targetWin: st.target && st.target.win != null ? st.target.win : null,
-      reach: me.reach ?? null,
-    });
-  });
-  // spikes: much harder than the median of the 3 stages before
-  const dv = out.map((s) => s.difficulty);
-  out.forEach((s, i) => { if (i < 3 || s.empty) { s.spike = 0; return; } const prev = dv.slice(i - 3, i).filter((x) => x != null).sort((a, b) => a - b); s.spike = prev.length ? s.difficulty - prev[Math.floor(prev.length / 2)] : 0; });
-  return out;
-}
-function summary(rep, sc) {
-  const ok = sc.filter((s) => !s.empty), d = ok.map((s) => s.difficulty), third = Math.max(1, Math.floor(ok.length / 3));
-  const camp = ok.some((s) => s.stall > 0 || s.tries > 1.05);
-  return {
-    avg: mean(d), trend: ok.length > 5 ? mean(ok.slice(-third).map((s) => s.difficulty)) - mean(ok.slice(0, third).map((s) => s.difficulty)) : null,
-    spikes: ok.filter((s) => s.spike > 20).length, frustrated: ok.filter((s) => s.frustration >= 45).length, bored: ok.filter((s) => s.boredom >= 60).length,
-    skill: mean(ok.filter((s) => s.skill != null).map((s) => s.skill)), conf: mean(ok.map((s) => s.conf)), tp: rep.targetPersona, camp,
-    hardest: [...ok].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3), easiest: [...ok].sort((a, b) => a.difficulty - b.difficulty).slice(0, 3),
-  };
-}
+// ---------- scores come from the shared model (same numbers as the command line tools) ----------
+const scores = M.scores, summary = M.summary;
 
 // ---------- a small chart used by Detect, Target and Calibrate ----------
 function Chart(box, cfg) {
@@ -298,67 +267,13 @@ function detectResults(root, d) {
 }
 
 // ---------- 2 · TARGET ----------
-const TPL = [['linear', 'Linear ramp'], ['slow', 'Slow start'], ['fast', 'Fast start'], ['scurve', 'S-curve'], ['waves', 'Waves per area'], ['stairs', 'Staircase'], ['flat', 'Flat'], ['smooth', 'Smooth current'], ['measured', 'Keep current']];
-const TAGS = { 'much-easier': -25, easier: -12, harder: 12, 'much-harder': 25, breather: -20, boss: null };
-const SPREAD = [['equal', 'Equally', 'Every stage moves by the same amount.'], ['later', 'Later stages more', 'Early stages barely change, the end of the game takes most of it.'], ['earlier', 'Earlier stages more', 'The start gets the change, the end stays close to now.'], ['middle', 'Middle more', 'The first and last stages stay, the middle takes most of it.']];
-const spreadWeights = (kind, n) => { const w = Array.from({ length: n }, (_, i) => { const t = n > 1 ? i / (n - 1) : 0; return kind === 'later' ? 0.15 + 1.7 * t : kind === 'earlier' ? 1.85 - 1.7 * t : kind === 'middle' ? 0.15 + 1.7 * Math.sin(Math.PI * t) : 1; }); const m = mean(w); return w.map((x) => x / m); };
-const defaultT = () => ({ spread: 'equal', snapshot: null, template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
-function initT() {
-  const t = A.st.targets, T0 = defaultT();
-  if (t && t.studio) return { ...T0, ...t.studio, tags: { ...(t.studio.tags || {}) }, pins: { ...(t.studio.pins || {}) } };
-  if (A.det) { T0.template = 'measured'; T0.snapshot = snapshotNow(A.st.info.stages); }
-  if (t) {
-    if (t.curve && !A.det) { T0.start = Math.round(100 * (1 - t.curve.start)); T0.end = Math.round(100 * (1 - t.curve.end)); T0.bossBump = Math.round(100 * (t.curve.bossDrop ?? 0.15)); }
-    T0.persona = t.targetPersona || 'smart'; T0.tolerance = Math.round(100 * (t.tolerance ?? 0.12)); T0.bosses = (t.bosses || []).map(String);
-  }
-  return T0;
-}
-const snapshotNow = (ids) => { const m = measuredArr(ids); let last = m.find((x) => x != null) ?? 50; return m.map((x) => { if (x != null) last = x; return last; }); };
+const { TPL, TAGS, SPREAD, defaultT } = M;
 function measuredArr(ids) { return ids.map((id) => { const s = A.det && A.det.scores.find((x) => x.id === id); return s && !s.empty ? s.difficulty : null; }); }
-function baseCurve(T, ids) {
-  const n = ids.length, out = [], m = (T.snapshot && T.snapshot.length === n) ? T.snapshot : measuredArr(ids), haveM = m.some((x) => x != null);
-  const fill = (a) => { let last = a.find((x) => x != null) ?? 50; return a.map((x) => { if (x != null) last = x; return last; }); };
-  const mf = fill(m);
-  for (let i = 0; i < n; i++) {
-    const t = n > 1 ? i / (n - 1) : 0, S = +T.start, E = +T.end, area = Math.max(2, +T.area || 10);
-    let v;
-    switch (T.template) {
-      case 'slow': v = S + (E - S) * t * t; break;
-      case 'fast': v = S + (E - S) * (1 - (1 - t) * (1 - t)); break;
-      case 'scurve': v = S + (E - S) * t * t * (3 - 2 * t); break;
-      case 'waves': v = S + (E - S) * t + (+T.wave) * ((i % area) / (area - 1) - 0.5); break;
-      case 'stairs': { const steps = Math.ceil(n / area); v = S + (E - S) * (steps > 1 ? Math.floor(i / area) / (steps - 1) : 0); break; }
-      case 'flat': v = (S + E) / 2; break;
-      case 'measured': v = haveM ? mf[i] : S + (E - S) * t; break;
-      case 'smooth': { if (!haveM) { v = S + (E - S) * t; break; } let a = 0, c = 0; for (let k = -3; k <= 3; k++) { const j = i + k; if (j >= 0 && j < n) { a += mf[j]; c++; } } v = a / c; break; }
-      default: v = S + (E - S) * t;
-    }
-    out.push(v);
-  }
-  return out;
-}
-function targetCurve(T, ids) {
-  const base = baseCurve(T, ids), noAuto = ['measured', 'smooth'].includes(T.template);   // measured difficulty already contains the bosses
-  const tagBoss = new Set(Object.entries(T.tags).filter(([, v]) => v === 'boss').map(([k]) => k));
-  const autoBoss = new Set(noAuto ? [] : (T.bosses || []));
-  const W = spreadWeights(T.spread || 'equal', ids.length);
-  const withMods = (shift) => base.map((v, i) => {
-    const id = ids[i], tag = T.tags[id];
-    let x = v + shift * W[i];
-    if (autoBoss.has(id) || tagBoss.has(id)) x += +T.bossBump;
-    if (tag && TAGS[tag] != null) x += TAGS[tag];
-    return clamp(x, 2, 98);
-  });
-  let shift = 0;
-  if (T.average != null) { for (let k = 0; k < 10; k++) shift += T.average - mean(withMods(shift)); }   // the average includes tags and bumps
-  return withMods(shift).map((v, i) => T.pins[ids[i]] != null ? clamp(T.pins[ids[i]], 2, 98) : v);
-}
-const targetsJson = (T, ids) => {
-  const old = A.st.targets || {}, d = targetCurve(T, ids), out = {};
-  for (const [k, v] of Object.entries(old)) if (!['curve', 'stages', 'studio', 'bosses', 'targetPersona', 'tolerance', '_help', '_note'].includes(k)) out[k] = v;
-  const bosses = [...new Set([...(T.bosses || []), ...Object.entries(T.tags).filter(([, v]) => v === 'boss').map(([k]) => k)])];
-  return { _note: 'Written by balance-sim studio. Win rates are 1 - difficulty/100 of the Target tab; edit them there.', targetPersona: T.persona, tolerance: +(T.tolerance / 100).toFixed(3), ...out, bosses, stages: Object.fromEntries(ids.map((id, i) => [id, { firstTryWin: +(1 - d[i] / 100).toFixed(3) }])), studio: T };
-};
+const snapshotNow = (ids) => M.fillGaps(measuredArr(ids));
+const baseCurve = (T, ids) => M.baseCurve(T, ids, measuredArr(ids));
+const targetCurve = (T, ids) => M.targetCurve(T, ids, measuredArr(ids));
+const targetsJson = (T, ids) => M.targetsJson(T, ids, measuredArr(ids), A.st.targets);
+const initT = () => M.modelFromTargets(A.st.targets, !!A.det, A.det ? snapshotNow(A.st.info.stages) : null);
 function thumb(name, T0) {
   const ids = Array.from({ length: 30 }, (_, i) => String(i + 1)), T = { ...defaultT(), template: name, start: 10, end: 60, area: 10, wave: 18, tags: {}, pins: {}, bosses: [], average: null };
   const m = A.det ? null : null; void m;
@@ -390,8 +305,16 @@ function viewTarget(root) {
     if (!noShape) form.append(slider('Difficulty at the first stage', 'start', 0, 100), slider('Difficulty at the last stage', 'end', 0, 100));
     else form.append(h('p', { class: 'hint' }, 'Starts from the difficulty measured in the last detection' + (T.template === 'smooth' ? ', with spikes smoothed out (7-stage moving average)' : ', as it is') + '. Use the average slider and the stage tags below to change it. The baseline is frozen when you save, so a newer detection does not move your target.'), h('button', { class: 'ghost', type: 'button', onclick: () => { T.snapshot = snapshotNow(ids); dirty(); chart.draw(); drawForm(); } }, 'Re-measure baseline from the latest detection'));
     if (T.template === 'waves' || T.template === 'stairs') form.append(slider('Stages per area', 'area', 3, 25), T.template === 'waves' ? slider('Wave height (points per area)', 'wave', 0, 50) : null);
-    form.append(h('div', null, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: T.average != null, onchange: (e) => { T.average = e.target.checked ? Math.round(mean(targetCurve({ ...T, average: null }, ids))) : null; dirty(); drawForm(); chart.draw(); } }), 'Fix the average difficulty of the whole game'),
-      T.average != null ? h('div', { style: 'margin-top:6px' }, slider('Average difficulty', 'average', 5, 95, 1, (v) => `${v} (${band(v)})`), h('div', null, h('label', null, 'Where should the change land?'), h('div', { class: 'seg' }, SPREAD.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String((T.spread || 'equal') === k), onclick: () => { T.spread = k; dirty(); drawForm(); chart.draw(); } }, l))), h('p', { class: 'hint' }, SPREAD.find(([k]) => k === (T.spread || 'equal'))[2] + ' The average stays exactly as set; only how it is shared between stages changes.')), h('div', { class: 'row' }, [-10, -5, 5, 10].map((dv) => h('button', { class: 'ghost', type: 'button', onclick: () => { T.average = clamp(T.average + dv, 5, 95); dirty(); drawForm(); chart.draw(); } }, (dv > 0 ? '+' : '\u2212') + Math.abs(dv) + (dv > 0 ? ' harder' : ' easier')))), measAvg != null ? h('p', { class: 'hint' }, `Measured now: ${Math.round(measAvg)}. The shape stays, the whole curve moves up or down.`) : null) : null));
+    const avgNow = T.average != null ? Math.round(T.average) : Math.round(mean(targetCurve(T, ids)));
+    const setAvg = (v) => { T.average = clamp(Math.round(v), 5, 95); dirty(); drawForm(); chart.draw(); };
+    form.append(h('div', { class: 'stack wholegame' },
+      h('h3', null, 'Make the whole game harder or easier'),
+      h('p', { class: 'hint' }, `Measured now: ${measAvg != null ? Math.round(measAvg) : '-'}. Target average: ${avgNow} (${band(avgNow)})${T.average == null ? ', not fixed yet. Move the slider or press a button to fix it.' : '.'}`),
+      h('input', { type: 'range', min: 5, max: 95, value: avgNow, 'aria-label': 'Average difficulty of the whole game', oninput: (e) => { T.average = +e.target.value; dirty(); chart.draw(); }, onchange: () => drawForm() }),
+      h('div', { class: 'row' }, [-10, -5, 5, 10].map((dv) => h('button', { class: 'ghost', type: 'button', onclick: () => setAvg(avgNow + dv) }, (dv > 0 ? '+' : '\u2212') + Math.abs(dv) + (dv > 0 ? ' harder' : ' easier')))),
+      h('div', null, h('label', null, 'Where should the change land?'), h('div', { class: 'seg' }, SPREAD.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String((T.spread || 'equal') === k), onclick: () => { T.spread = k; dirty(); drawForm(); chart.draw(); } }, l))),
+        h('p', { class: 'hint' }, SPREAD.find(([k]) => k === (T.spread || 'equal'))[2] + (T.average == null ? ' It takes effect as soon as you change the average.' : ' The average stays exactly as set; only how it is shared between stages changes.'))),
+      T.average != null ? h('button', { class: 'ghost', type: 'button', onclick: () => { T.average = null; dirty(); drawForm(); chart.draw(); } }, 'Release the average (follow the curve again)') : null));
     form.append(slider('Boss bump (extra difficulty on bosses)', 'bossBump', 0, 40), slider('Tolerance (± points that still count as on target)', 'tolerance', 3, 30));
     form.append(h('div', null, h('label', null, 'Reference bot (the "average player")'), h('select', { onchange: (e) => { T.persona = e.target.value; dirty(); } }, personas.map((p) => h('option', { value: p, selected: p === T.persona }, p)))));
   }
@@ -515,6 +438,10 @@ function calibResults(out, d) {
     h('button', { class: 'primary', onclick: async () => { await api('/api/candidate', { body: { params: res.params, from: run.id } }); await refresh(); A.form.useCand = true; render(); } }, 'Use as active candidate'),
     h('button', { class: 'ghost', onclick: () => cp(JSON.stringify(res.params, null, 2)) }, 'Copy values (JSON)'),
     h('button', { class: 'ghost', onclick: () => cp(prompt()) }, 'Copy a prompt for Claude to apply it'), copied));
+  out.append(h('div', { class: 'panel stack' }, h('h3', null, 'What happens next'),
+    h('ol', null, h('li', null, 'Use it as the active candidate (button above), so later runs can include these values.'), h('li', null, 'Apply the values to the real game data. Copy the prompt for Claude: it edits the files one stage at a time.'), h('li', null, 'Verify: run a detection again. The stages should now sit on your target.')),
+    h('div', { class: 'row' }, h('button', { class: 'primary', onclick: async () => { try { await api('/api/candidate', { body: { params: res.params, from: run.id } }); await refresh(); A.form.useCand = true; const m = await api('/api/jobs', { body: { kind: 'detect', personas: A.form.personas.size ? [...A.form.personas] : null, runs: A.form.runs, retries: A.form.retries, seed: A.form.seed, useCandidate: true } }); A.det = null; A.tab = 'detect'; history.replaceState(null, '', '#detect'); await afterStart(m.id); } catch (e) { toast(e.message); } } }, 'Verify now: detection with this candidate'),
+      h('span', { class: 'hint' }, 'You do not start over. Step 1 is the check after a change. If it is not right yet, adjust the target and calibrate again.'))));
   out.append(h('p', { class: 'hint' }, 'The studio never edits your game files. "Active candidate" only feeds these values into later runs; applying them to the real data is a separate step (ask Claude with the prompt above).'));
 }
 

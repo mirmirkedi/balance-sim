@@ -11,3 +11,5 @@ to a subagent with model "haiku" and effort "medium" (unless this session alread
 target (start win rate, end win rate, boss stages) or propose one from the skill defaults before running anything.
 
 If the user wants the curve fixed (not just measured), follow the skill's "Tuning loop (agentic)" section: you choose the levers and read every result; `scripts/tune.mjs` only evaluates candidates.
+
+First ask the user ONE question: "Web arayüzüyle mi (tıklayarak) yoksa burada konuşarak mı yapalım?" Web: follow commands/balance-studio.md (start the studio). Talk: follow the skill's "Conversation mode" section (detect.mjs, your opinion, target.mjs dry run, calibrate.mjs, apply, detect again). Either way write the connector (adapter) first.
