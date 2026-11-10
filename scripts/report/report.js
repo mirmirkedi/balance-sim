@@ -132,7 +132,7 @@ if (D.camp) {
 
 // ---------- chart ----------
 let W = 760, H = 330, pw = 0, ph = 0;
-const L = 48, R = 14, T = 14, B = 34;
+const L = 48, R = 64, T = 14, B = 34;
 function geom() { const w = ($('#chartwrap').clientWidth || 760) - 16; W = Math.max(300, w); H = Math.round(Math.min(360, Math.max(230, W * 0.46))); pw = W - L - R; ph = H - T - B; }
 const xs = (i) => L + (n > 1 ? pw * i / (n - 1) : pw / 2);
 function domainMax(k) {
@@ -157,7 +157,15 @@ function drawChart() {
   if (m.k === 'win' && !state.hidden.has(tp)) S.forEach((st, i) => { const q = me(st); if (q) g += `<line x1="${xs(i)}" x2="${xs(i)}" y1="${ys(q.lo)}" y2="${ys(q.hi)}" stroke="${personaColor(tp)}" stroke-width="2" opacity=".28"/>`; });
   const path = (get) => { let d = '', pen = false; S.forEach((st, i) => { const v = get(st); if (v == null) { pen = false; return; } d += `${pen ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(v).toFixed(1)}`; pen = true; }); return d; };
   D.personas.filter((p) => !state.hidden.has(p)).forEach((p) => { g += `<path d="${path((st) => val(st, p, m.k))}" fill="none" stroke="${personaColor(p)}" stroke-width="${p === tp ? 3 : 1.6}" stroke-linejoin="round" opacity="${p === tp ? 1 : .85}"/>`; });
-  if (m.target && S.some((st) => st.target[m.k] != null)) g += `<path d="${path((st) => st.target[m.k])}" fill="none" stroke="var(--fg)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  if (m.target && S.some((st) => st.target[m.k] != null)) g += `<path d="${path((st) => st.target[m.k])}" fill="none" stroke="var(--fg)" stroke-width="2.4" stroke-dasharray="7 5"/>`;
+  // name the lines where they end, so nobody has to guess which one is the target
+  const ends = D.personas.filter((p) => !state.hidden.has(p)).map((p) => { const st = [...S].reverse().find((x) => val(x, p, m.k) != null); return st ? { y: ys(val(st, p, m.k)), x: xs(st.idx), t: p, c: personaColor(p), b: p === tp } : null; }).filter(Boolean);
+  const tl = m.target ? [...S].reverse().find((x) => x.target[m.k] != null) : null;
+  if (tl) ends.push({ y: ys(tl.target[m.k]), x: xs(tl.idx), t: 'TARGET', c: 'var(--fg)', b: true });
+  ends.forEach((e) => { e.y = Math.min(e.y, T + ph - 12); });
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  ends.forEach((e) => { g += `<text x="${e.x + 8}" y="${e.y + 4}" font-size="11.5" fill="${e.c}" ${e.b ? 'font-weight="700"' : ''}>${esc(e.t)}</text>`; });
   if (!state.hidden.has(tp)) S.forEach((st, i) => { const v = val(st, tp, m.k); if (v != null && st.flags.some((f) => sev(f) === 'bad')) g += `<circle cx="${xs(i)}" cy="${ys(v)}" r="6" fill="none" stroke="var(--bad)" stroke-width="2"/>`; });
   if (state.hover != null) { const i = state.hover; g += `<line x1="${xs(i)}" x2="${xs(i)}" y1="${T}" y2="${T + ph}" stroke="var(--mut)" stroke-dasharray="3 3"/>`; D.personas.filter((p) => !state.hidden.has(p)).forEach((p) => { const v = val(S[i], p, m.k); if (v != null) g += `<circle cx="${xs(i)}" cy="${ys(v)}" r="4" fill="${personaColor(p)}"/>`; }); }
   const svg = $('#chart');
@@ -199,7 +207,7 @@ function controls() {
       h('i', { style: 'background:' + personaColor(p) }), p + (p === tp ? ' (target persona)' : ''));
     box.append(b);
   });
-  box.append(h('span', { class: 'chip', style: 'border-style:dashed' }, h('i', { style: 'background:var(--fg)' }), 'target'));
+  box.append(h('span', { class: 'chip', style: 'border-style:dashed', title: 'The curve the stages should follow (from the target file)' }, h('i', { style: 'width:18px;height:3px;background:repeating-linear-gradient(90deg,var(--fg) 0 6px,transparent 6px 10px)' }), 'TARGET curve (dashed)'));
 }
 controls();
 
