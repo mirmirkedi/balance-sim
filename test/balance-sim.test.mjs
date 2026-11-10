@@ -354,3 +354,21 @@ export default { ...base, levers: { stage: base.levers.stage, strong: { ...base.
   const res = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8'));
   assert.ok(Array.isArray(res.warnings) && res.warnings.length > 0 && /another lever/.test(res.warnings[0].text));
 });
+
+test('survey: lists game data by system and flags what the logs cannot see', () => {
+  const proj = path.join(tmp, 'survey-proj');
+  fs.mkdirSync(path.join(proj, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'data', 'enemies.json'), JSON.stringify({ grunt: { hp: 20, atk: 2 }, ghost: { hp: 5, atk: 9 } }));
+  fs.writeFileSync(path.join(proj, 'data', 'economy.json'), JSON.stringify({ dropChance: 0.3, upgradeCost: [10, 20, 40] }));
+  const logs = path.join(tmp, 'survey-logs');
+  run('runner.mjs', ['--adapter', adapter('toy-wave'), '--personas', 'smart', '--runs', '6', '--stages', '1-4', '--out', logs]);
+  const out = JSON.parse(run('survey.mjs', ['--dir', proj, '--logs', logs, '--json']));
+  assert.ok(out.data.some((d) => d.file.endsWith('enemies.json')) && out.data.some((d) => d.cats.drops));
+  assert.ok(out.logs.kills > 0);
+  assert.ok(out.findings.some((f) => /ghost/.test(f.text) && /never appear/.test(f.text)), 'an enemy that is defined but never seen is reported');
+  // a bot program that logs only end + spend: the loot system is invisible
+  const bare = path.join(tmp, 'survey-bare'); fs.mkdirSync(bare, { recursive: true });
+  fs.writeFileSync(path.join(bare, 'smart.jsonl'), [{ type: 'end', stage: 1, win: true, run: 0 }, { type: 'spend', stage: 1, data: { res: 'gold', amount: 5 } }].map((x) => JSON.stringify(x)).join('\n') + '\n');
+  const out2 = JSON.parse(run('survey.mjs', ['--dir', proj, '--logs', bare, '--json']));
+  assert.ok(out2.findings.some((f) => f.level === 'warn' && /INVISIBLE/.test(f.text)));
+});

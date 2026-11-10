@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.4.0
+- **Survey** (`scripts/survey.mjs`): scans the game's JSON data by system and checks the logs for what the bots saw: no kill/drop events (loot invisible), kills but no drops, stages without drops, items or enemies defined but never seen, resources earned and never spent. SKILL.md: "What can be balanced here? Survey the game first" (list systems, ask scope, research per genre, make them visible, agree numbers).
 - **External runner adapters** for games in Godot, Unity or any other program: `adapter.external.command(ctx)`; the runner slices runs, runs copies in parallel and joins the logs. Template `examples/external-runner/`; smoke-tested on the Godot port of PR-15.
 - Calibration safety nets: noise guard (dead band plus one standard error), warnings when a lever is pushed far, `--lever <name>` for other declared levers.
 - Default `--jobs` follows free cores (cores minus load); adapters can cap it with `maxJobs`.

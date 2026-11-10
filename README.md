@@ -18,6 +18,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
 - **Personas** `random`, `novice`, `smart`, `optimizer` (2-move lookahead) and `oracle` (the game's exact solver, for puzzles). The gaps between them show skill depth, mistake cost and weak policies.
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
+- **Survey first** (`survey.mjs`): lists the game's JSON data by system (drops, economy, combat, progression ...) and checks what the bots actually experienced: kills without drops, items never seen, money earned and never spent, and event types missing from the logs, so a system the simulation cannot see (like a loot table that never drops) is found before anyone tunes the wrong thing.
 - **Several levers, not one number.** Per stage it can scale a stat (`levers.stage`), swap the stage's content types (enemies, tile types, obstacles: `levers.compose`, `--compose`, with a `valid()` veto for unsolvable puzzles) or use another declared lever (`--lever player`). It skips stages that are only noise, and warns when one lever is pushed far (a x20 multiplier means the cause is elsewhere).
 - **Option balance** (`options.mjs`): how often each action or upgrade is chosen and how much the win rate drops without it: dead, mandatory, dominant options.
 - **Any engine.** Node games get an adapter. A game in Godot, Unity or anything else gets an *external runner* adapter: balance-sim starts your program, which plays the bots and writes the same logs; analysis, studio and calibration work unchanged. Template: `examples/external-runner/`.
@@ -55,7 +56,7 @@ Bots are not humans: the scores describe the bots. A real playtest of the change
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
-npm test                                   # 29 end-to-end tests
+npm test                                   # 30 end-to-end tests
 ```
 
 Then in Claude Code, in the game's folder: `/balance-studio`, or just say "balance this game" / "balance layalım" (Claude asks whether to use this skill).
@@ -101,6 +102,7 @@ Write an adapter for your own game from `templates/adapter.template.mjs` (Node g
 | `scripts/detect.mjs`, `scripts/target.mjs` | conversation mode: measure with scores, preview and write a target from the command line |
 | `scripts/model.mjs`, `scripts/project.mjs` | shared scores and target model (web and command line use the same numbers), run folder helpers |
 | `scripts/calibrate.mjs` | moves per-stage levers until the measured curve meets the target; `--compose` also swaps content types (enemies, tile types, obstacles) (used by the studio, also a CLI) |
+| `scripts/survey.mjs` | what is there to balance: the game's JSON data by system plus what the logs show (drops, economy, unseen items, missing events) |
 | `scripts/options.mjs` | option balance: how often each action/upgrade is chosen and what the win rate loses when it is removed (dead, mandatory, dominant options) |
 | `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |

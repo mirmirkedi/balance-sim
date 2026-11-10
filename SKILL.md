@@ -50,6 +50,17 @@ Running the simulations and reading the report is mechanical, so it should not b
 - Keep on the main model: understanding a complicated game's code to write its adapter (step 2), choosing which number to change, and the plain-words report to the user. Filling the adapter template for a simple game can go to the Haiku subagent too.
 - One subagent per job (a baseline run, a sweep). Do not spawn one per persona or per stage.
 
+## What can be balanced here? Survey the game first (before choosing levers)
+
+A win-rate curve only covers stage strength. Real games also have **drops and loot, an economy (faucets and sinks), upgrades and shop costs, enemy and item tables, player growth.** Each is a separate system with its own numbers in the game's JSON files (levels, parameters, tables). Balancing only the curve leaves the rest unbalanced, and a system the simulation cannot see stays broken (PR-15: the drop table barely dropped anything and no report showed it).
+
+1. **Run `node scripts/survey.mjs --dir <game>`** (after one detection run). It lists every JSON file by system (drops, economy, combat, timing, progression, counts) and checks the logs: kills vs drops, drops per stage, items defined but never seen, resources earned and never spent, and event types the logs do not contain at all. Key-name heuristics: use it as a pointer, then READ the data files yourself and look at the code that uses them.
+2. **Write the list of systems to the user** (stage strength, enemy table, drops/loot, economy, upgrades, player growth ...) and ask which are in scope. Do not silently balance only the one you can measure.
+3. **Research each system for this game type** (web search, as in "Game type first"): typical drop rates and pity rules, how fast currency should pile up, what an upgrade costs relative to income, how rarity weights are usually set. Cite what you found with its confidence; write new findings back to `references/genres.json`.
+4. **Make every system visible before tuning it.** The adapter or bot program must emit `kill` (data.victim), `drop` (data.item, data.amount), `gain` and `spend` (data.res, data.amount) events, and the run must keep event logs (`--full 3` or more). If the survey says INVISIBLE, adding these events is the first job, not tuning.
+5. **Agree numbers per system with the user** (e.g. "a drop every ~4 kills on average, first rare item by stage 8, gold gained/spent between 0.8x and 1.5x") and check them with `survey.mjs` and `analyze.mjs --details`. There is no automatic calibration of drops or economy yet: change one table entry at a time, re-run, compare.
+6. Observed vs defined: when `dropRarityWeights` says 5% and the bots see 0.3%, the cause is in the game code or the drop path, not in the weights. Say that instead of editing the weights.
+
 ## Workflow (in this order, never skip 1)
 
 1. **Target curve first.** Copy `templates/targets.template.json` into the game's `parameters/` and fill it.
