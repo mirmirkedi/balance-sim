@@ -300,7 +300,9 @@ function detectResults(root, d) {
 // ---------- 2 · TARGET ----------
 const TPL = [['linear', 'Linear ramp'], ['slow', 'Slow start'], ['fast', 'Fast start'], ['scurve', 'S-curve'], ['waves', 'Waves per area'], ['stairs', 'Staircase'], ['flat', 'Flat'], ['smooth', 'Smooth current'], ['measured', 'Keep current']];
 const TAGS = { 'much-easier': -25, easier: -12, harder: 12, 'much-harder': 25, breather: -20, boss: null };
-const defaultT = () => ({ snapshot: null, template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
+const SPREAD = [['equal', 'Equally', 'Every stage moves by the same amount.'], ['later', 'Later stages more', 'Early stages barely change, the end of the game takes most of it.'], ['earlier', 'Earlier stages more', 'The start gets the change, the end stays close to now.'], ['middle', 'Middle more', 'The first and last stages stay, the middle takes most of it.']];
+const spreadWeights = (kind, n) => { const w = Array.from({ length: n }, (_, i) => { const t = n > 1 ? i / (n - 1) : 0; return kind === 'later' ? 0.15 + 1.7 * t : kind === 'earlier' ? 1.85 - 1.7 * t : kind === 'middle' ? 0.15 + 1.7 * Math.sin(Math.PI * t) : 1; }); const m = mean(w); return w.map((x) => x / m); };
+const defaultT = () => ({ spread: 'equal', snapshot: null, template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
 function initT() {
   const t = A.st.targets, T0 = defaultT();
   if (t && t.studio) return { ...T0, ...t.studio, tags: { ...(t.studio.tags || {}) }, pins: { ...(t.studio.pins || {}) } };
@@ -339,9 +341,10 @@ function targetCurve(T, ids) {
   const base = baseCurve(T, ids), noAuto = ['measured', 'smooth'].includes(T.template);   // measured difficulty already contains the bosses
   const tagBoss = new Set(Object.entries(T.tags).filter(([, v]) => v === 'boss').map(([k]) => k));
   const autoBoss = new Set(noAuto ? [] : (T.bosses || []));
+  const W = spreadWeights(T.spread || 'equal', ids.length);
   const withMods = (shift) => base.map((v, i) => {
     const id = ids[i], tag = T.tags[id];
-    let x = v + shift;
+    let x = v + shift * W[i];
     if (autoBoss.has(id) || tagBoss.has(id)) x += +T.bossBump;
     if (tag && TAGS[tag] != null) x += TAGS[tag];
     return clamp(x, 2, 98);
@@ -388,7 +391,7 @@ function viewTarget(root) {
     else form.append(h('p', { class: 'hint' }, 'Starts from the difficulty measured in the last detection' + (T.template === 'smooth' ? ', with spikes smoothed out (7-stage moving average)' : ', as it is') + '. Use the average slider and the stage tags below to change it. The baseline is frozen when you save, so a newer detection does not move your target.'), h('button', { class: 'ghost', type: 'button', onclick: () => { T.snapshot = snapshotNow(ids); dirty(); chart.draw(); drawForm(); } }, 'Re-measure baseline from the latest detection'));
     if (T.template === 'waves' || T.template === 'stairs') form.append(slider('Stages per area', 'area', 3, 25), T.template === 'waves' ? slider('Wave height (points per area)', 'wave', 0, 50) : null);
     form.append(h('div', null, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: T.average != null, onchange: (e) => { T.average = e.target.checked ? Math.round(mean(targetCurve({ ...T, average: null }, ids))) : null; dirty(); drawForm(); chart.draw(); } }), 'Fix the average difficulty of the whole game'),
-      T.average != null ? h('div', { style: 'margin-top:6px' }, slider('Average difficulty', 'average', 5, 95, 1, (v) => `${v} (${band(v)})`), h('div', { class: 'row' }, [-10, -5, 5, 10].map((dv) => h('button', { class: 'ghost', type: 'button', onclick: () => { T.average = clamp(T.average + dv, 5, 95); dirty(); drawForm(); chart.draw(); } }, (dv > 0 ? '+' : '\u2212') + Math.abs(dv) + (dv > 0 ? ' harder' : ' easier')))), measAvg != null ? h('p', { class: 'hint' }, `Measured now: ${Math.round(measAvg)}. The shape stays, the whole curve moves up or down.`) : null) : null));
+      T.average != null ? h('div', { style: 'margin-top:6px' }, slider('Average difficulty', 'average', 5, 95, 1, (v) => `${v} (${band(v)})`), h('div', null, h('label', null, 'Where should the change land?'), h('div', { class: 'seg' }, SPREAD.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String((T.spread || 'equal') === k), onclick: () => { T.spread = k; dirty(); drawForm(); chart.draw(); } }, l))), h('p', { class: 'hint' }, SPREAD.find(([k]) => k === (T.spread || 'equal'))[2] + ' The average stays exactly as set; only how it is shared between stages changes.')), h('div', { class: 'row' }, [-10, -5, 5, 10].map((dv) => h('button', { class: 'ghost', type: 'button', onclick: () => { T.average = clamp(T.average + dv, 5, 95); dirty(); drawForm(); chart.draw(); } }, (dv > 0 ? '+' : '\u2212') + Math.abs(dv) + (dv > 0 ? ' harder' : ' easier')))), measAvg != null ? h('p', { class: 'hint' }, `Measured now: ${Math.round(measAvg)}. The shape stays, the whole curve moves up or down.`) : null) : null));
     form.append(slider('Boss bump (extra difficulty on bosses)', 'bossBump', 0, 40), slider('Tolerance (± points that still count as on target)', 'tolerance', 3, 30));
     form.append(h('div', null, h('label', null, 'Reference bot (the "average player")'), h('select', { onchange: (e) => { T.persona = e.target.value; dirty(); } }, personas.map((p) => h('option', { value: p, selected: p === T.persona }, p)))));
   }
