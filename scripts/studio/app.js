@@ -267,6 +267,7 @@ function detectResults(root, d) {
         h('td', { class: 'l' }, s.flags.map(flagEl)))))));
   }
   detailBox(); table();
+  root.append(h('div', { class: 'panel row' }, h('span', null, h('b', null, 'Next: '), 'this is how hard the game is now. Decide what it should be: make the whole game harder or easier, or single stages.'), h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => go('target') }, 'Set the target \u2192')));
   root.append(h('h2', { style: 'margin-top:18px' }, 'All stages'), tw);
   root.append(h('details', { style: 'margin-top:12px' }, h('summary', null, 'How the scores are computed'), h('dl', null,
     h('dt', null, 'Difficulty'), h('dd', null, '100 × (1 − first-try win rate of the reference bot). This is the number the target editor changes.'),
@@ -282,19 +283,21 @@ function detectResults(root, d) {
 // ---------- 2 · TARGET ----------
 const TPL = [['linear', 'Linear ramp'], ['slow', 'Slow start'], ['fast', 'Fast start'], ['scurve', 'S-curve'], ['waves', 'Waves per area'], ['stairs', 'Staircase'], ['flat', 'Flat'], ['smooth', 'Smooth current'], ['measured', 'Keep current']];
 const TAGS = { 'much-easier': -25, easier: -12, harder: 12, 'much-harder': 25, breather: -20, boss: null };
-const defaultT = () => ({ template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
+const defaultT = () => ({ snapshot: null, template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
 function initT() {
   const t = A.st.targets, T0 = defaultT();
   if (t && t.studio) return { ...T0, ...t.studio, tags: { ...(t.studio.tags || {}) }, pins: { ...(t.studio.pins || {}) } };
+  if (A.det) { T0.template = 'measured'; T0.snapshot = snapshotNow(A.st.info.stages); }
   if (t) {
-    if (t.curve) { T0.start = Math.round(100 * (1 - t.curve.start)); T0.end = Math.round(100 * (1 - t.curve.end)); T0.bossBump = Math.round(100 * (t.curve.bossDrop ?? 0.15)); }
+    if (t.curve && !A.det) { T0.start = Math.round(100 * (1 - t.curve.start)); T0.end = Math.round(100 * (1 - t.curve.end)); T0.bossBump = Math.round(100 * (t.curve.bossDrop ?? 0.15)); }
     T0.persona = t.targetPersona || 'smart'; T0.tolerance = Math.round(100 * (t.tolerance ?? 0.12)); T0.bosses = (t.bosses || []).map(String);
   }
   return T0;
 }
+const snapshotNow = (ids) => { const m = measuredArr(ids); let last = m.find((x) => x != null) ?? 50; return m.map((x) => { if (x != null) last = x; return last; }); };
 function measuredArr(ids) { return ids.map((id) => { const s = A.det && A.det.scores.find((x) => x.id === id); return s && !s.empty ? s.difficulty : null; }); }
 function baseCurve(T, ids) {
-  const n = ids.length, out = [], m = measuredArr(ids), haveM = m.some((x) => x != null);
+  const n = ids.length, out = [], m = (T.snapshot && T.snapshot.length === n) ? T.snapshot : measuredArr(ids), haveM = m.some((x) => x != null);
   const fill = (a) => { let last = a.find((x) => x != null) ?? 50; return a.map((x) => { if (x != null) last = x; return last; }); };
   const mf = fill(m);
   for (let i = 0; i < n; i++) {
@@ -316,17 +319,19 @@ function baseCurve(T, ids) {
   return out;
 }
 function targetCurve(T, ids) {
-  let d = baseCurve(T, ids);
-  if (T.average != null) { for (let k = 0; k < 6; k++) { const sh = T.average - mean(d.map((x) => clamp(x, 2, 98))); d = d.map((x) => x + sh); } }
-  const bossSet = new Set([...(T.bosses || []), ...Object.entries(T.tags).filter(([, v]) => v === 'boss').map(([k]) => k)]);
-  return d.map((v, i) => {
-    const id = ids[i];
-    if (T.pins[id] != null) return clamp(T.pins[id], 2, 98);
-    const tag = T.tags[id];
-    if (bossSet.has(id)) v += +T.bossBump;
-    if (tag && TAGS[tag] != null) v += TAGS[tag];
-    return clamp(v, 2, 98);
+  const base = baseCurve(T, ids), noAuto = ['measured', 'smooth'].includes(T.template);   // measured difficulty already contains the bosses
+  const tagBoss = new Set(Object.entries(T.tags).filter(([, v]) => v === 'boss').map(([k]) => k));
+  const autoBoss = new Set(noAuto ? [] : (T.bosses || []));
+  const withMods = (shift) => base.map((v, i) => {
+    const id = ids[i], tag = T.tags[id];
+    let x = v + shift;
+    if (autoBoss.has(id) || tagBoss.has(id)) x += +T.bossBump;
+    if (tag && TAGS[tag] != null) x += TAGS[tag];
+    return clamp(x, 2, 98);
   });
+  let shift = 0;
+  if (T.average != null) { for (let k = 0; k < 10; k++) shift += T.average - mean(withMods(shift)); }   // the average includes tags and bumps
+  return withMods(shift).map((v, i) => T.pins[ids[i]] != null ? clamp(T.pins[ids[i]], 2, 98) : v);
 }
 const targetsJson = (T, ids) => {
   const old = A.st.targets || {}, d = targetCurve(T, ids), out = {};
@@ -345,6 +350,7 @@ function viewTarget(root) {
   const info = A.st.info;
   root.append(h('h1', null, '2 · Target'), h('p', { class: 'lead' }, 'Decide how hard each stage SHOULD be. Pick a template curve, move the average difficulty, tag stages (this one harder, that one a breather, boss), or drag a point on the chart. The measured curve from the last detection run is drawn underneath so you see the gap.'));
   if (!info) { root.append(h('div', { class: 'note bad' }, A.st.infoError)); return; }
+  if (!A.det) { root.append(h('div', { class: 'panel stack' }, h('h3', null, 'Measure the game first'), h('p', null, 'A target only makes sense next to the current difficulty. Run a detection (step 1), then come back: the editor starts from what the game does now, and you move it from there (the whole game harder or easier, single stages, or a template curve).'), h('button', { class: 'primary', onclick: () => go('detect') }, 'Go to Detect'))); return; }
   if (!A.T) A.T = initT();
   const T = A.T, ids = info.stages;
   const personas = A.det ? Object.keys(A.det.report.stages[Object.keys(A.det.report.stages)[0]]).filter((k) => !['target', 'flags'].includes(k)) : ['smart'];
@@ -354,7 +360,7 @@ function viewTarget(root) {
   const left = h('div', { class: 'panel stack' });
   left.append(h('h3', null, 'Template curve'));
   const tpl = h('div', { class: 'tpl' });
-  const drawTpl = () => { tpl.textContent = ''; TPL.forEach(([k, label]) => tpl.append(h('button', { type: 'button', 'aria-pressed': String(T.template === k), onclick: () => { T.template = k; dirty(); drawTpl(); drawForm(); chart.draw(); } }, thumb(k), label))); };
+  const drawTpl = () => { tpl.textContent = ''; TPL.forEach(([k, label]) => tpl.append(h('button', { type: 'button', 'aria-pressed': String(T.template === k), onclick: () => { T.template = k; if (['measured', 'smooth'].includes(k) && !(T.snapshot && T.snapshot.length)) T.snapshot = snapshotNow(ids); dirty(); drawTpl(); drawForm(); chart.draw(); } }, thumb(k), label))); };
   left.append(tpl);
   const form = h('div', { class: 'stack' }); left.append(form);
   const slider = (label, key, min, max, step, fmt) => h('div', null, h('label', null, h('span', null, label + ': '), h('b', { id: 'v-' + key }, fmt ? fmt(T[key]) : T[key])), h('input', { type: 'range', min, max, step: step || 1, value: T[key], oninput: (e) => { T[key] = +e.target.value; $('#v-' + key).textContent = fmt ? fmt(T[key]) : T[key]; dirty(); chart.draw(); } }));
@@ -362,10 +368,10 @@ function viewTarget(root) {
     form.textContent = '';
     const noShape = ['measured', 'smooth'].includes(T.template);
     if (!noShape) form.append(slider('Difficulty at the first stage', 'start', 0, 100), slider('Difficulty at the last stage', 'end', 0, 100));
-    else form.append(h('p', { class: 'hint' }, A.det ? 'Uses the measured curve' + (T.template === 'smooth' ? ' with spikes smoothed out (7-stage moving average)' : ' as it is') + '. Tags and pins below still apply.' : 'Run a detection first: this template needs the measured curve.'));
+    else form.append(h('p', { class: 'hint' }, 'Starts from the difficulty measured in the last detection' + (T.template === 'smooth' ? ', with spikes smoothed out (7-stage moving average)' : ', as it is') + '. Use the average slider and the stage tags below to change it. The baseline is frozen when you save, so a newer detection does not move your target.'), h('button', { class: 'ghost', type: 'button', onclick: () => { T.snapshot = snapshotNow(ids); dirty(); chart.draw(); drawForm(); } }, 'Re-measure baseline from the latest detection'));
     if (T.template === 'waves' || T.template === 'stairs') form.append(slider('Stages per area', 'area', 3, 25), T.template === 'waves' ? slider('Wave height (points per area)', 'wave', 0, 50) : null);
-    form.append(h('div', null, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: T.average != null, onchange: (e) => { T.average = e.target.checked ? Math.round(measAvg ?? mean(targetCurve({ ...T, average: null }, ids))) : null; dirty(); drawForm(); chart.draw(); } }), 'Fix the average difficulty of the whole game'),
-      T.average != null ? h('div', { style: 'margin-top:6px' }, slider('Average difficulty', 'average', 5, 95, 1, (v) => `${v} (${band(v)})`), measAvg != null ? h('p', { class: 'hint' }, `Measured now: ${Math.round(measAvg)}. The shape stays, the whole curve moves up or down.`) : null) : null));
+    form.append(h('div', null, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: T.average != null, onchange: (e) => { T.average = e.target.checked ? Math.round(mean(targetCurve({ ...T, average: null }, ids))) : null; dirty(); drawForm(); chart.draw(); } }), 'Fix the average difficulty of the whole game'),
+      T.average != null ? h('div', { style: 'margin-top:6px' }, slider('Average difficulty', 'average', 5, 95, 1, (v) => `${v} (${band(v)})`), h('div', { class: 'row' }, [-10, -5, 5, 10].map((dv) => h('button', { class: 'ghost', type: 'button', onclick: () => { T.average = clamp(T.average + dv, 5, 95); dirty(); drawForm(); chart.draw(); } }, (dv > 0 ? '+' : '\u2212') + Math.abs(dv) + (dv > 0 ? ' harder' : ' easier')))), measAvg != null ? h('p', { class: 'hint' }, `Measured now: ${Math.round(measAvg)}. The shape stays, the whole curve moves up or down.`) : null) : null));
     form.append(slider('Boss bump (extra difficulty on bosses)', 'bossBump', 0, 40), slider('Tolerance (± points that still count as on target)', 'tolerance', 3, 30));
     form.append(h('div', null, h('label', null, 'Reference bot (the "average player")'), h('select', { onchange: (e) => { T.persona = e.target.value; dirty(); } }, personas.map((p) => h('option', { value: p, selected: p === T.persona }, p)))));
   }
@@ -407,7 +413,7 @@ function viewTarget(root) {
     h('button', { class: 'ghost', type: 'button', onclick: () => { A.T = initT(); A.Tdirty = false; render(); } }, 'Discard changes'),
     h('button', { class: 'ghost', type: 'button', onclick: () => { T.tags = {}; T.pins = {}; dirty(); stageBox(); chart.draw(); } }, 'Clear tags and pins'));
   right.append(h('h3', null, 'Target curve'), h('p', { class: 'hint' }, 'The dashed line is the TARGET, the green band its tolerance, the coloured line what the bot measured. Drag a dashed point to pin it.'), cbox, sumBox, stage, actions);
-  root.append(h('div', { class: 'grid2', style: 'grid-template-columns:minmax(280px,360px) 1fr;align-items:start' }, left, right));
+  root.append(h('div', { class: 'tgrid' }, left, right));
   drawTpl(); drawForm(); chart.draw(); stageBox(); summaryBox();
   root.append(h('p', { class: 'hint' }, `Saved to ${A.st.targetsFile} as one first-try win rate per stage (1 − difficulty/100), so the report, the tuner and the calibrator all read the same numbers.`));
 }
@@ -418,6 +424,7 @@ function viewCalibrate(root) {
   root.append(h('h1', null, '3 · Calibrate'), h('p', { class: 'lead' }, 'Let the studio move the per-stage difficulty lever of your game until the measured curve meets the target. Every round uses a fresh seed (so it does not fit noise); the best result is verified on yet another seed and compared with the untouched game.'));
   if (!info) { root.append(h('div', { class: 'note bad' }, A.st.infoError)); return; }
   if (!info.levers) root.append(h('div', { class: 'note' }, h('b', null, 'This adapter declares no calibration lever. '), 'Calibration by script needs a number per stage that makes it harder or easier (adapter export `levers.stage`). Without it you can still measure against the target (Detect tab) and ask Claude to tune with the agentic loop.'));
+  if (!A.det) { root.append(h('div', { class: 'panel stack' }, h('h3', null, 'Measure the game first'), h('p', null, 'Calibration needs the current difficulty and a target. Run a detection (step 1), set the target (step 2), then come back.'), h('button', { class: 'primary', onclick: () => go('detect') }, 'Go to Detect'))); return; }
   const hasTarget = !!A.st.targets;
   if (!hasTarget) root.append(h('div', { class: 'note' }, 'No target saved yet. Set one in the Target tab first.'));
   if (A.Tdirty) root.append(h('div', { class: 'note' }, h('b', null, 'You have unsaved target changes. '), 'Calibration uses the saved target.', h('button', { class: 'ghost', style: 'margin-left:8px', onclick: () => go('target') }, 'Go to Target')));

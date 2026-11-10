@@ -23,17 +23,41 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Calibrate** bots against real playtest numbers (`--humans`).
 - **Interactive HTML report** (`--html`): summary cards, "look here first", metric and persona toggles, hover tooltips, click a stage for a plain-words explanation with what to try, sortable and filterable table, flag glossary, dark mode. One self-contained file, no network.
 
+## Quick start (the normal way: with Claude)
+
+You do not write any code. You talk to Claude Code in the game's folder:
+
+1. **Install once** (below), then say "balance layalım" or run `/balance-studio`.
+2. **Claude builds the connector first.** The studio needs a small adapter file in the game (`tools/balance/adapter.mjs`) that lets the bots play it: which actions exist, how a step works, who won. Claude reads your game and writes it (it reuses a headless engine or an existing bot if the game has one, otherwise it runs the real game code in a Node `vm`). It also declares the one number per stage that makes it harder or easier (`levers`), so calibration can work. Claude checks the adapter with a short run before going on.
+3. **Claude starts the studio** (`node ~/.claude/skills/balance-sim/scripts/studio.mjs`) and gives you the URL.
+4. **You use the four steps in the browser:**
+   - **Detect.** See how hard the game is *right now*: an average difficulty and a difficulty score for every stage. No target needed yet.
+   - **Target.** The editor starts from that measured curve. Make the whole game harder or easier (average difficulty slider, +5/+10), tag single stages (harder, easier, boss, breather), drag a point, or switch to a template curve.
+   - **Calibrate.** The studio moves the per-stage lever until the measured curve meets your target and verifies it on a fresh seed.
+   - **Runs and logs.** Console, attempt log, replay, full report of every run.
+5. **Claude applies the result.** The studio never edits your game. Press "Copy a prompt for Claude to apply it" and paste it: Claude changes the game's data files one stage at a time with a CHANGELOG line, rebuilds, and you detect again to compare.
+
+Bots are not humans: the scores describe the bots. A real playtest of the changed stages decides.
+
 ## Install
 
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
-cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
+cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
 npm test                                   # 18 end-to-end tests
 ```
 
-Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
+Then in Claude Code, in the game's folder: `/balance-studio` or just "balance layalım" (Claude asks whether to use this skill).
 
-## Use without Claude
+## Without Claude (you already have an adapter)
+
+```bash
+cd <game folder>
+node ~/.claude/skills/balance-sim/scripts/studio.mjs                     # the web app
+node ~/.claude/skills/balance-sim/scripts/studio.mjs --adapter path/to/adapter.mjs --targets path/to/targets.json --port 4173
+```
+
+## Command line tools
 
 ```bash
 node scripts/runner.mjs  --adapter examples/toy-wave/adapter.mjs --runs 100 --out logs/base
