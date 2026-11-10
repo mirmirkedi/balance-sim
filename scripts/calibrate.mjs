@@ -65,11 +65,11 @@ const power = (id) => (comp.types.find((t) => t.id === id) || {}).power ?? 1;
 const protectedT = new Set((comp && comp.protect) || []);
 // best swap (1..3 units of A -> same number of B) whose power change is closest to the wanted one; null when none points the right way
 // (a swap pointing the wrong way, or overshooting the wanted change by more than 60%, is skipped: the numeric lever does the rest)
-function bestSwap(r, want) {
+function bestSwap(r, want, stageId) {
   let best = null;
   for (const A of Object.keys(r)) for (const B of comp.types.map((t) => t.id)) {
     if (A === B || protectedT.has(A) || protectedT.has(B) || !(r[A] > 0)) continue;
-    for (let n = 1; n <= Math.min(3, r[A]); n++) { const d = n * (power(B) - power(A)); if (d * want <= 0 || Math.abs(d) > 1.6 * Math.abs(want)) continue; const err = Math.abs(d - want); if (!best || err < best.err) best = { A, B, n, err }; }
+    for (let n = 1; n <= Math.min(3, r[A]); n++) { const d = n * (power(B) - power(A)); if (d * want <= 0 || Math.abs(d) > 1.6 * Math.abs(want)) continue; const err = Math.abs(d - want); if (best && err >= best.err) continue; if (comp.valid) { const t = { ...r, [A]: r[A] - n, [B]: (r[B] || 0) + n }; if (!comp.valid(stageId, t)) continue; } best = { A, B, n, err }; }
   }
   return best;
 }
@@ -130,7 +130,7 @@ for (let r = 1; r <= rounds; r++) {
     if (Math.abs(delta) < dead) continue;
     if (useComp && Math.abs(delta) >= swapAt) {   // far off: change WHICH enemies, then let the numeric lever fine-tune next round
       const r = rosters.get(s), total = Object.entries(r).reduce((a, [k, n]) => a + n * power(k), 0), want = total * (Math.exp(K * delta * harder) - 1);
-      const sw = bestSwap(r, want);
+      const sw = bestSwap(r, want, s);
       if (sw) { r[sw.A] -= sw.n; r[sw.B] = (r[sw.B] || 0) + sw.n; console.log(`[calib] stage ${s}: swap ${sw.n} ${sw.A} -> ${sw.B} (${delta > 0 ? 'too easy' : 'too hard'} by ${Math.round(Math.abs(delta) * 100)} pts)`); moved++; continue; }
     }
     const v = vals.get(s);

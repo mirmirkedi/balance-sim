@@ -91,7 +91,7 @@ export default {
   levers: {
     stage: { param: 'stageMul.{stage}', mode: 'mul', harder: 1, min: 0.4, max: 3, default: 1, unit: 'x' },
     // optional: swap enemy TYPES per stage (calibrate.mjs --compose). power = hp x atk of one unit.
-    compose: { param: 'comp.{stage}', types: Object.entries(KINDS).map(([id, k]) => ({ id, power: +(k.hp * k.atk).toFixed(2) })), read: (stage) => defaultRoster(Number(stage)) },
+    compose: { noun: 'enemy', param: 'comp.{stage}', types: Object.entries(KINDS).map(([id, k]) => ({ id, power: +(k.hp * k.atk).toFixed(2) })), read: (stage) => defaultRoster(Number(stage)) },
   },
   create({ stage, seed, emit, params }) { const g = Toy.init(stage, seed, params); g.emit = emit; return g; },
   // sensible human play: drink at low hp, otherwise kill the most dangerous enemy that dies fastest

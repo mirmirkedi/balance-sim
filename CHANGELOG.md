@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.4.0
-- **Enemy mix as a lever**: adapter `levers.compose` + `calibrate.mjs --compose` swap enemy types per stage ("2 grunts -> 2 archers") when a stage is far off target, then the numeric lever fine-tunes. Studio: "Also swap enemy types" checkbox, rosters shown in the changes table.
+- **Content mix as a lever**: adapter `levers.compose` + `calibrate.mjs --compose` swap content types per stage (enemies, tile types, obstacles: "2 grunts -> 2 archers", "2 plain tiles -> 2 stones") when a stage is far off target, then the numeric lever fine-tunes. Adapter-defined `noun`, `power` per type, optional `valid(stage, mix)` to refuse unplayable mixes (unsolvable puzzles). Studio: "Also swap ... types" checkbox, mixes shown in the changes table.
 - **Option balance**: `scripts/options.mjs` (usage share + ablation: win-rate change when one option is removed, verdicts DEAD / MANDATORY / DOMINANT / HARMFUL). Runner now counts chosen actions (`acts` on every `end` event) and supports `--set ban.<option>=1`.
 
 ## 0.3.0

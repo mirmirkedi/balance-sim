@@ -43,7 +43,7 @@ async function loadAdapter() {
     const l = a.levers && a.levers.stage;
     info = {
       stages: a.stages.map(String), campaign: !!a.campaign, studio: a.studio || {}, hasOracle: !!a.oracle, hasEvaluate: !!a.evaluate,
-      compose: a.levers && a.levers.compose ? { types: a.levers.compose.types, protect: a.levers.compose.protect || [] } : null,
+      compose: a.levers && a.levers.compose ? { noun: a.levers.compose.noun || 'content', types: a.levers.compose.types, protect: a.levers.compose.protect || [] } : null,
       levers: l ? { param: l.param, mode: l.mode || 'mul', harder: l.harder ?? 1, min: l.min ?? null, max: l.max ?? null, default: l.default ?? null, unit: l.unit || '', integer: !!l.integer } : null,
       leverValues: l ? Object.fromEntries(a.stages.map(String).map((s) => [s, l.read ? l.read(s) : l.default ?? null])) : null,
     };

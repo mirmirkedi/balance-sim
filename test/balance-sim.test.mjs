@@ -302,3 +302,14 @@ test('options.mjs reports usage and the cost of removing each option', () => {
   const heal = out.options.find((o) => o.id === 'heal');
   assert.ok(heal.share >= 0 && heal.share < 1 && typeof heal.delta === 'number');
 });
+
+test('compose valid() can veto a mix (e.g. an unsolvable puzzle)', () => {
+  const wrap = path.join(tmp, 'veto-adapter.mjs');
+  fs.writeFileSync(wrap, `import base from ${JSON.stringify(adapter('toy-wave'))};
+export default { ...base, levers: { ...base.levers, compose: { ...base.levers.compose, valid: (s, m) => !m.archer } } };
+`);
+  const out = path.join(tmp, 'veto');
+  run('calibrate.mjs', ['--adapter', wrap, '--targets', path.join(root, 'examples', 'toy-wave', 'targets.json'), '--out', out, '--rounds', '3', '--runs', '30', '--compose']);
+  const res = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8'));
+  assert.ok(res.changes.filter((c) => c.kind === 'compose').every((c) => !/archer/.test(c.to)));
+});
