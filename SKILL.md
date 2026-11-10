@@ -42,6 +42,25 @@ Running the simulations and reading the report is mechanical, so it should not b
 
 Run the big validation (many runs, all stages, campaign) last, after content changes. While iterating use `--runs 30 --stages a-b`. Below ~50 runs the CI is wide: trust `?EASY`/`?HARD` only as "run more".
 
+## Tuning loop (agentic): the agent decides, scripts only measure
+
+Use when one-variable sweeps are not enough (the curve has the wrong SHAPE: a wall at stage 5, everything easy after 15). `scripts/tune.mjs` never picks numbers by itself. You do, by reading results. Do not replace this with a blind optimizer.
+
+1. **Diagnose first.** From the baseline report list the problem stages and the reason (use `--details` and `--replay`): boss HP too high? income too low so the shop is empty? one formula too steep? Write one sentence per problem.
+2. **Choose the levers.** Pick 2-4 parameters that plausibly cause it (`parameters/*.json` keys the adapter reads from `params`). Say why each. Set sane ranges (never "make the enemy harmless to hit the curve"). Keep parameters the user said are fixed out of it.
+3. **Evaluate candidates** (this is the mechanical part, delegate to Haiku, see Cost):
+   ```bash
+   node $S/tune.mjs --adapter A --targets T --state tune-state --runs 60 \
+        --cand "hpUp:enemyHp=1.3" --cand "hpUp+gold:enemyHp=1.3,goldMul=1.2"      # your hypotheses
+   node $S/tune.mjs --adapter A --targets T --state tune-state --scout 12 --ranges "enemyHp=0.9..1.5,goldMul=1..1.4"   # optional random scouting inside YOUR ranges
+   ```
+   Baseline is added automatically. The history is kept in `tune-state/history.jsonl`; `--history` lists it, `--detail <name>` shows a candidate stage by stage.
+4. **Interpret, do not just take the lowest loss.** Check: which stages are still outside the tolerance and in which direction; are the remaining flags (WALL, SPIKE, NO_SKILL) gone or moved; did the shape improve or only the average; does the result make design sense (a boss still feels like a boss, money still has a sink). Replay one flagged stage of the best candidate. Low loss with a changed character of the game is a bad candidate.
+5. **Next round.** Write down what you learned (lever X moves stages a-b by about N points), narrow the ranges or change levers, and repeat 3-4. Stop when the problem stages are inside the band, or when two rounds bring no gain (then the formula or the mechanic must change, not the numbers). Typically 3-5 rounds.
+6. **Verify and hand over.** Take the best 1-2 candidates, run them with `--runs 200` on all personas (`runner.mjs` + `analyze.mjs --compare`), and also check `random` and `novice` did not break. Then apply ONE change at a time to the data file with a CHANGELOG line, as in the balancing rules. Tell the user what changed and why, and that bots are not humans: a real playtest of the changed stages decides.
+
+Bots run now, an LLM-played persona can be added later as an extra persona with the same log format.
+
 ## Which kind of game is it?
 
 | game | legalActions() | extra |

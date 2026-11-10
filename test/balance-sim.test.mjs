@@ -123,3 +123,18 @@ test('params from --set reach the adapter', () => {
   run('runner.mjs', [...base, '--set', 'enemyHp=2', '--out', hard]);
   assert.ok(winRate(ends(easy, 'smart')) > winRate(ends(hard, 'smart')));
 });
+
+test('tune evaluates candidates, adds a baseline, keeps history and shows details', () => {
+  const st = path.join(tmp, 'tune-state');
+  const base = ['--adapter', adapter('toy-wave'), '--targets', targets('toy-wave'), '--state', st, '--runs', '15', '--stages', '1-6'];
+  const out = run('tune.mjs', [...base, '--cand', 'easy:enemyHp=0.7', '--cand', 'hard:enemyHp=1.8']);
+  assert.match(out, /baseline loss/);
+  assert.match(out, /easy/);
+  const hist = run('tune.mjs', ['--state', st, '--history']);
+  assert.match(hist, /base/);
+  assert.match(hist, /hard/);
+  const scout = run('tune.mjs', [...base, '--scout', '2', '--ranges', 'enemyHp=0.8..1.4']);
+  assert.match(scout, /s4/);
+  const det = run('tune.mjs', ['--state', st, '--adapter', adapter('toy-wave'), '--detail', 'easy']);
+  assert.match(det, /stage\s+win\s+target/);
+});

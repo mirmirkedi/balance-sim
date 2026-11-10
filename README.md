@@ -16,6 +16,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Personas** `random`, `novice`, `smart`, `optimizer`. The gaps between them show skill depth, mistake cost and weak policies.
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
 - **Sweep** one parameter over several values and pick the best (`sweep.mjs`).
+- **Agentic tuning** (`tune.mjs`): the agent proposes parameter sets, the script measures them (loss, remaining flags, per-stage deltas, history); the agent interprets and iterates.
 - **Replay** any single run as a timeline (`--replay smart:7:12`).
 - **Calibrate** bots against real playtest numbers (`--humans`).
 - **HTML report** with curve, target band and flagged stages (`--html`).
@@ -25,7 +26,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill and the /balance command into ~/.claude
-npm test                                   # 12 end-to-end tests
+npm test                                   # 13 end-to-end tests
 ```
 
 Then in Claude Code: `/balance`, or just say "balance layalım" (Claude asks whether to use this skill).
@@ -51,6 +52,7 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/runner.mjs` | plays stages with personas (normal, `--campaign`, `--replay`), writes JSONL logs |
 | `scripts/analyze.mjs` | curve + CI, all target metrics, funnel, calibration, economy, `--compare`, `--html` |
 | `scripts/sweep.mjs` | one parameter, several values, best fit to the target curve |
+| `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |
 | `scripts/personas.mjs`, `lib.mjs`, `rng.mjs` | personas (+ `chooseItem` for shops), shared run loop, seeded RNG |
 | `templates/` | adapter and target-curve templates |
 | `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr15-html-vm` (a real single-HTML game run headless in a Node vm; set `PR15_GAME=/path/to/game.html`) |
