@@ -160,6 +160,7 @@ const server = http.createServer(async (req, res) => {
       const f = p === '/' ? 'app.html' : p.slice(1);
       return send(res, 200, fs.readFileSync(path.join(web, f)), MIME[path.extname(f)]);
     }
+    if (req.method === 'GET' && p === '/api/genres') return send(res, 200, readJson(path.join(here, '..', 'references', 'genres.json'), {}));
     if (req.method === 'GET' && p === '/model.mjs') return send(res, 200, fs.readFileSync(path.join(here, 'model.mjs')), MIME['.js']);
     if (p === '/api/state') return send(res, 200, { project: path.basename(projectDir), dir: projectDir, adapter: show(adapterPath), targetsFile: show(targetsPath), info, infoError, config: config(), targets: targets(), runs: listRuns(), job: job ? { id: job.id, kind: job.kind, status: job.status } : null });
     if (p === '/api/reload' && req.method === 'POST') { await loadAdapter(); return send(res, 200, { ok: !infoError, error: infoError }); }

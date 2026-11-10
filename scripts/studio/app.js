@@ -293,6 +293,21 @@ function viewTarget(root) {
   const dirty = () => { A.Tdirty = true; summaryBox(); };
   const measAvg = A.det ? A.det.sum.avg : null;
   const left = h('div', { class: 'panel stack' });
+  const genreBox = h('div', { class: 'stack genre' });
+  const BASIS = { sourced: ['sourced', 'done'], anecdote: ['practitioner anecdote', 'running'], judgment: ['judgment, no source found', 'stopped'] };
+  function drawGenre() {
+    genreBox.textContent = '';
+    const G = A.genres || {}, keys = Object.keys(G).filter((k) => !k.startsWith('_')), cur = T.genre || (A.st.info.studio && A.st.info.studio.genre) || '';
+    genreBox.append(h('h3', null, 'What kind of game is this?'), h('select', { 'aria-label': 'Game type', onchange: (e) => { T.genre = e.target.value || null; dirty(); drawGenre(); } }, h('option', { value: '' }, 'not set'), keys.map((k) => h('option', { value: k, selected: k === cur }, G[k].name))));
+    const g = G[cur];
+    if (!g) { genreBox.append(h('p', { class: 'hint' }, 'The right curve depends on the kind of game. Pick the type to see what is usually recommended and how sure that is. If your type is not listed, ask Claude to research it: it adds the findings to references/genres.json.')); return; }
+    const [bt, bc] = BASIS[g.basis] || [g.basis, 'stopped'];
+    genreBox.append(h('p', null, h('span', { class: 'badge ' + bc }, bt)), h('ul', { class: 'tight' }, g.notes.map((n) => h('li', null, n))),
+      g.sources.length ? h('p', { class: 'hint' }, 'Sources: ', g.sources.flatMap((x, i) => [i ? ' \u00b7 ' : '', h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title)])) : h('p', { class: 'hint' }, 'No sources yet. Ask Claude to research this type before you trust any number here.'),
+      h('button', { class: 'ghost', type: 'button', onclick: () => { Object.assign(T, g.suggest); T.snapshot = null; dirty(); drawTpl(); drawForm(); chart.draw(); drawGenre(); } }, 'Use the suggested shape'),
+      h('p', { class: 'hint' }, 'The suggestion replaces "Keep current" with a typical shape for this type. You can still move the average and tag single stages afterwards.'));
+  }
+  left.append(genreBox);
   left.append(h('h3', null, 'Template curve'));
   const tpl = h('div', { class: 'tpl' });
   const drawTpl = () => { tpl.textContent = ''; TPL.forEach(([k, label]) => tpl.append(h('button', { type: 'button', 'aria-pressed': String(T.template === k), onclick: () => { T.template = k; if (['measured', 'smooth'].includes(k) && !(T.snapshot && T.snapshot.length)) T.snapshot = snapshotNow(ids); dirty(); drawTpl(); drawForm(); chart.draw(); } }, thumb(k), label))); };
@@ -357,6 +372,7 @@ function viewTarget(root) {
     h('button', { class: 'ghost', type: 'button', onclick: () => { T.tags = {}; T.pins = {}; dirty(); stageBox(); chart.draw(); } }, 'Clear tags and pins'));
   right.append(h('h3', null, 'Target curve'), h('p', { class: 'hint' }, 'The dashed line is the TARGET, the green band its tolerance, the coloured line what the bot measured. Drag a dashed point to pin it.'), cbox, sumBox, stage, actions);
   root.append(h('div', { class: 'tgrid' }, left, right));
+  drawGenre();
   drawTpl(); drawForm(); chart.draw(); stageBox(); summaryBox();
   root.append(h('p', { class: 'hint' }, `Saved to ${A.st.targetsFile} as one first-try win rate per stage (1 − difficulty/100), so the report, the tuner and the calibrator all read the same numbers.`));
 }
@@ -489,7 +505,7 @@ async function render() {
   if (!A.st) return;
   try {
     if (A.tab === 'detect') { if (A.det === null) await loadDetect(); viewDetect(root); }
-    else if (A.tab === 'target') { if (A.det === null) await loadDetect(); viewTarget(root); }
+    else if (A.tab === 'target') { if (A.det === null) await loadDetect(); if (!A.genres) { try { A.genres = await api('/api/genres'); } catch (e) { A.genres = {}; } } viewTarget(root); }
     else if (A.tab === 'calibrate') { if (A.det === null) await loadDetect(); if (!A.calib) await loadCalib(); viewCalibrate(root); }
     else viewLogs(root);
   } catch (e) { root.append(h('div', { class: 'note bad' }, String(e.message || e))); }

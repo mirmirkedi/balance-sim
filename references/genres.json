@@ -1,0 +1,114 @@
+{
+  "_help": "Genre knowledge base for the agent and the studio. Each entry says what a good difficulty curve usually looks like for that kind of game, HOW SURE we are (basis) and where it comes from (sources). The agent must extend this file when it researches a new genre or finds better sources, and must never present a number as an industry standard unless a source here says so. Updated 2026-11. suggest = the starting shape the studio offers (template, start/end difficulty 0-100, area = stages per wave, wave = height, bossBump).",
+  "_basis": {
+    "sourced": "a real source (paper, studio postmortem, trade article) says it",
+    "anecdote": "one developer or one article says it; useful, not a rule",
+    "judgment": "the agent's own reasoning, no source found: say so to the user and ask them"
+  },
+  "_research_log": "2026-11: web search found NO sourced numeric first-try win-rate benchmark per genre. Sources agree on SHAPE (sawtooth over a straight ramp, avoid sudden spikes, find spikes with logs and funnels) but numeric targets are design choices to validate with the game's own data.",
+  "general": {
+    "name": "Any game (shape rules that several sources agree on)",
+    "basis": "anecdote",
+    "notes": [
+      "A good curve is not a straight line: alternate challenge and relief (sawtooth) instead of a pure staircase.",
+      "Sudden difficulty spikes are named as a top cause of mid-game churn.",
+      "Designers misjudge their own levels (they played them many times): measure fresh players or bots and look where attempts pile up and where players quit.",
+      "Players improve at different speeds, one curve never fits everyone: decide the audience first (casual, mid-core, hardcore).",
+      "Hand-authored difficulty plus playtesting plus curve fitting is the usual route; difficulty is hard to quantify."
+    ],
+    "suggest": { "template": "waves", "start": 8, "end": 55, "area": 10, "wave": 16, "bossBump": 12 },
+    "sources": [
+      { "title": "Level design and difficulty: how to challenge players without losing them (Stepico)", "url": "https://stepico.com/blog/video-game-level-design-and-difficulty-how-to-challenge-players-without-losing-them/" },
+      { "title": "Boost player retention in mobile games (Appstorys)", "url": "https://appstorys.com/blog-Boost-Player-Retention-Mobile-Games" }
+    ]
+  },
+  "puzzle": {
+    "name": "Puzzle / match-3 / tile / move-limited levels",
+    "aliases": ["match3", "match-3", "tile", "move-limited", "puzzle"],
+    "basis": "anecdote",
+    "notes": [
+      "Difficulty of a puzzle level is its win probability, which in practice is the completion rate (research on puzzle games defines it this way).",
+      "Sawtooth curves are used on purpose: hard levels followed by easier ones, repeatedly (a puzzle generator in a paper produces exactly this shape).",
+      "One tile-game QA article calls 'hard' levels those with about 1 win per 8-10 attempts (roughly 10-12% win rate) and says they are used to nudge players to pay, with churn as the price. Treat it as an example, not a benchmark.",
+      "No sourced target for the average first-try win rate was found: decide it with the user (casual 60-70%, mid-core ~50%, hardcore 30-40% are judgment values) and check against real completion data.",
+      "Exact solvers are the right 'smart' bot for puzzles: use the oracle persona to check solvability and slack, heuristic bots only show how hard it is for a naive player."
+    ],
+    "suggest": { "template": "waves", "start": 10, "end": 50, "area": 10, "wave": 22, "bossBump": 18 },
+    "sources": [
+      { "title": "Statistical modelling of level difficulty in puzzle games (arXiv 2107.03305)", "url": "https://arxiv.org/pdf/2107.03305v1" },
+      { "title": "Tile games: level design best practices for testing like a pro (Game Developer)", "url": "https://gamedeveloper.com/design/tile-games-level-design-best-practices-for-testing-like-a-pro" }
+    ]
+  },
+  "roguelike": {
+    "name": "Roguelike / run-based (one run = win or die)",
+    "aliases": ["roguelite", "deckbuilder", "run-based"],
+    "basis": "anecdote",
+    "notes": [
+      "No consensus win rate. One developer tuned a roguelike-style game with a headless harness until a strong team won about one third of the time (about 31%).",
+      "A secondhand devlog claim says even experts reach only about 30% wins at high Slay the Spire ascension levels: approximate, not verified.",
+      "A design writer argues the hardest tier should not be so hard that only ~10% of everything lining up wins, and the base difficulty should be winnable by most people once they learned the rules.",
+      "A run's outcome should come more from skill than luck: do not look at the win rate only, also look at WHERE losing runs end (which floor, which boss).",
+      "Stage here means a floor or a boss: the curve is a survival curve (share of runs still alive), not a first-try win rate per level. Say this to the user."
+    ],
+    "suggest": { "template": "scurve", "start": 5, "end": 70, "area": 10, "wave": 10, "bossBump": 15 },
+    "sources": [
+      { "title": "Balancing a roguelike to a one-in-three win rate with a headless harness", "url": "https://solodevstack.com/blog/balancing-roguelike-headless-harness" },
+      { "title": "How modern roguelikes are becoming accessible (Game Wisdom)", "url": "https://game-wisdom.com/?p=24881" },
+      { "title": "Choose your difficulty (Hypnagonia devlog)", "url": "https://dbzer0.itch.io/hypnagonia/devlog/365095/choose-your-difficulty" }
+    ]
+  },
+  "tower-defense": {
+    "name": "Tower defense / wave survival",
+    "aliases": ["td", "wave survival", "wave defense"],
+    "basis": "anecdote",
+    "notes": [
+      "Sources here are developer comments and community reviews, no authoritative guide was found.",
+      "Boss or elite waves on a fixed rhythm (one survival TD uses every 5th wave) give a sawtooth by design.",
+      "Reviews complain about a sharp jump early then a flat, stale mix; one team later softened late maps because the curve was too steep. Watch both the spike and the plateau.",
+      "Difficulty is hard to quantify: hand-authored waves, playtesting, then fitting the spawn counts to the curve is the usual process."
+    ],
+    "suggest": { "template": "waves", "start": 5, "end": 60, "area": 5, "wave": 15, "bossBump": 20 },
+    "sources": [
+      { "title": "2112TD developer thread (TouchArcade)", "url": "https://toucharcade.com/community/threads/2112td-tower-defense-survival-by-refinery-games.409293/page-10" },
+      { "title": "Zombie game wave difficulty progression (GameDev.net)", "url": "https://www.gamedev.net/topic/627974-zombie-game-wave-difficulty-progression/" },
+      { "title": "Game balance of the tower defense genre: Crush Link TD (Medium)", "url": "https://medium.com/@gabvanfet/game-balance-of-the-tower-defense-genre-on-the-case-of-crush-link-td-a00bac3d0c00" }
+    ]
+  },
+  "idle-rpg": {
+    "name": "Idle / incremental / auto-battler RPG with stages and bosses",
+    "aliases": ["idle", "incremental", "auto-battler", "afk rpg", "chapter rpg"],
+    "basis": "judgment",
+    "notes": [
+      "No usable source found (the search returned forum threads and wikis only). Everything here is the agent's judgment: say so and ask the user what the progression is supposed to feel like.",
+      "Typical logic: stages are power checks, the player returns stronger from upgrades, so walls are acceptable IF the player has something to spend and a clear way to get stronger (the faucet and sink must be there).",
+      "Bosses every N stages work as scheduled walls: they should be visibly harder than their neighbours.",
+      "Measure retries and quit rate (campaign mode), not only the first-try win rate: a high first-try failure is fine when one retry after upgrading usually wins.",
+      "Run research again (extended web search) for the specific game family before recommending numbers."
+    ],
+    "suggest": { "template": "waves", "start": 5, "end": 55, "area": 5, "wave": 12, "bossBump": 15 },
+    "sources": []
+  },
+  "action": {
+    "name": "Action / platformer / skill-based levels",
+    "aliases": ["platformer", "runner", "shooter"],
+    "basis": "judgment",
+    "notes": [
+      "No source gathered yet. Judgment: skill levels have a steeper learning-curve ramp inside each world and a reset (breather) at the start of the next world.",
+      "Bots only approximate human reflexes (use actionRepeat): treat the curve as relative, check with real playtests.",
+      "Research this genre on the web before recommending numbers."
+    ],
+    "suggest": { "template": "waves", "start": 5, "end": 60, "area": 8, "wave": 20, "bossBump": 15 },
+    "sources": []
+  },
+  "card": {
+    "name": "Card game / deck battler / PvE ladder",
+    "aliases": ["ccg", "deckbuilder", "card battler"],
+    "basis": "judgment",
+    "notes": [
+      "No source gathered yet. Judgment: decks and card pool make the curve player-dependent, so use several bot skill levels and report the spread, not one number.",
+      "Research this genre on the web before recommending numbers."
+    ],
+    "suggest": { "template": "scurve", "start": 8, "end": 60, "area": 10, "wave": 12, "bossBump": 12 },
+    "sources": []
+  }
+}

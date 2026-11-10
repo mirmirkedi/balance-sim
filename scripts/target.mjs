@@ -13,14 +13,20 @@
 //        [--tag 12=harder,25=boss,30=breather]   much-easier | easier | harder | much-harder | boss | breather
 //        [--pin 5=40]                            exact difficulty for a stage
 //        [--bosses 5,10,15] [--boss-bump 15] [--tolerance 15] [--persona smart]
+//        [--genre puzzle|roguelike|tower-defense|idle-rpg|action|card|general]  start from the typical shape of this game type and show what is known about it
+//        [--list-genres]                         the game types in references/genres.json, with how sure each entry is
 //        [--reset]                               forget the saved model, start again from the measured curve
 //        [--write]                               save targets.json (the old one is kept as .balance-sim/targets.prev.json)
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { openProject, readJson, writeJson } from './project.mjs';
 import { scores, summary, band, mean, TAGS, SPREAD, TPL, targetCurve, targetsJson, modelFromTargets, fillGaps } from './model.mjs';
 
 const argv = process.argv.slice(2);
+const GENRES = readJson(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'references', 'genres.json'), {});
+const genreKeys = Object.keys(GENRES).filter((k) => !k.startsWith('_'));
+if (argv.includes('--list-genres')) { for (const k of genreKeys) console.log(`${k.padEnd(14)} ${GENRES[k].basis.padEnd(9)} ${GENRES[k].name}`); process.exit(0); }
 const P = openProject(argv);
 const adapter = await P.adapter();
 const ids = adapter.stages.map(String);
@@ -51,8 +57,14 @@ const free = targetCurve({ ...T, average: null }, ids, measured);   // the curve
 if (P.arg('average') != null) T.average = +P.arg('average');
 else if (P.arg('shift') != null) T.average = Math.round(mean(free) + +P.arg('shift'));
 
+const genreId = P.arg('genre') || (adapter.studio && adapter.studio.genre) || T.genre || null;
+if (P.arg('genre')) { const g = GENRES[P.arg('genre')]; if (!g) { console.error('unknown genre ' + P.arg('genre') + ' (have: ' + genreKeys.join(', ') + ')'); process.exit(1); } Object.assign(T, g.suggest); T.snapshot = null; T.genre = P.arg('genre'); }
+else if (genreId && !T.genre) T.genre = genreId;
 const tc = targetCurve(T, ids, measured), mAvg = mean(measured.filter((x) => x != null)), tAvg = mean(tc);
 console.log(`\nTARGET PROPOSAL (based on ${meta.id}, reference bot ${sm.tp})`);
+const G = GENRES[T.genre];
+console.log(G ? `game type: ${G.name} [${G.basis}]${G.sources.length ? '' : ' (no source yet: research before trusting numbers)'}` : 'game type: not set. The right curve depends on the game: tell the user what you assume, ask, and research it (SKILL.md, "Game type first").');
+if (G && P.has('genre')) { for (const n of G.notes) console.log('  - ' + n); for (const s of G.sources) console.log('  source: ' + s.title + ' ' + s.url); }
 console.log(`template: ${T.template}   average: ${Math.round(mAvg)} (${band(mAvg)}) now  ->  ${Math.round(tAvg)} (${band(tAvg)}) target   spread: ${T.spread}   tolerance: +-${T.tolerance}`);
 if (Object.keys(T.tags).length || Object.keys(T.pins).length) console.log(`tags: ${Object.entries(T.tags).map(([k, v]) => k + '=' + v).join(', ') || '-'}   pins: ${Object.entries(T.pins).map(([k, v]) => k + '=' + v).join(', ') || '-'}`);
 console.log(`\nstage   now  target  change   (now / target: # = 10 points)`);

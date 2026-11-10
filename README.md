@@ -20,6 +20,7 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
 - **Sweep** one parameter over several values and pick the best (`sweep.mjs`).
 - **Agentic tuning** (`tune.mjs`): the agent proposes parameter sets, the script measures them (loss, remaining flags, per-stage deltas, history); the agent interprets and iterates.
+- **Genre-aware advice.** The right curve depends on the kind of game. `references/genres.json` holds what is known per type (puzzle, roguelike, tower defense, idle RPG, action, card) with an honest confidence level and sources; the studio shows it next to the target editor and the agent researches the web when a type is missing, then writes the findings back. There is no sourced numeric benchmark for most genres, and the tool says so.
 - **Replay** any single run as a timeline (`--replay smart:7:12`).
 - **Check the bots against real players** with playtest numbers (`--humans`).
 - **Interactive HTML report** (`--html`): summary cards, "look here first", metric and persona toggles, hover tooltips, click a stage for a plain-words explanation with what to try, sortable and filterable table, flag glossary, dark mode. One self-contained file, no network.
@@ -50,7 +51,7 @@ Bots are not humans: the scores describe the bots. A real playtest of the change
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
-npm test                                   # 21 end-to-end tests
+npm test                                   # 22 end-to-end tests
 ```
 
 Then in Claude Code, in the game's folder: `/balance-studio`, or just say "balance this game" / "balance layalım" (Claude asks whether to use this skill).

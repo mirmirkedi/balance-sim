@@ -63,5 +63,7 @@ for (const s of sc) {
 }
 const look = ok.filter((s) => s.spike > 20 || s.frustration >= 45 || s.flags.some((f) => ['WALL', 'TOO_HARD', 'TOO_EASY', 'SPIKE'].includes(f))).sort((a, b) => Math.abs(b.spike) + b.frustration - Math.abs(a.spike) - a.frustration).slice(0, 8);
 console.log(`\nWORTH A LOOK: ${look.length ? look.map((s) => `${s.id} (difficulty ${Math.round(s.difficulty)}${s.spike > 20 ? `, spike +${Math.round(s.spike)}` : ''}${s.frustration >= 45 ? `, frustration ${Math.round(s.frustration)}` : ''})`).join('; ') : 'nothing stands out'}`);
+const gid = adapter.studio && adapter.studio.genre;
+console.log(gid ? `\ngame type (from the adapter): ${gid}. Advice and the shape of a good curve depend on it: see references/genres.json and SKILL.md "Game type first".` : '\ngame type: not declared. Ask the user what kind of game it is before recommending a curve (SKILL.md, "Game type first").');
 console.log(`\nfull report: ${path.join(dir, 'report.html')}`);
 console.log('Bots are not humans: these scores describe the bots. Difficulty = 100 x (1 - first-try win rate of the reference bot).');

@@ -254,3 +254,24 @@ test('conversation mode: detect.mjs prints scores, target.mjs is a dry run until
   const runs = fs.readdirSync(path.join(proj, '.balance-sim', 'runs'));
   assert.ok(runs.some((d) => d.startsWith('detect-')));                      // same run folder as the web studio
 });
+
+test('genre knowledge base is well formed and target.mjs can start from a genre', () => {
+  const G = JSON.parse(fs.readFileSync(path.join(root, 'references', 'genres.json'), 'utf8'));
+  const keys = Object.keys(G).filter((k) => !k.startsWith('_'));
+  assert.ok(keys.includes('puzzle') && keys.includes('idle-rpg') && keys.includes('general'));
+  for (const k of keys) {
+    const g = G[k];
+    assert.ok(['sourced', 'anecdote', 'judgment'].includes(g.basis), k);
+    assert.ok(g.notes.length > 0 && g.suggest.template && g.suggest.end > g.suggest.start, k);
+    for (const s of g.sources) assert.match(s.url, /^https:\/\//);
+    if (g.basis !== 'judgment') assert.ok(g.sources.length > 0, k + ' claims a source basis but lists none');   // honesty check
+  }
+  const proj = path.join(tmp, 'genre-proj');
+  fs.mkdirSync(proj, { recursive: true });
+  const common = ['--dir', proj, '--adapter', adapter('toy-wave'), '--targets', path.join(proj, 'targets.json')];
+  run('detect.mjs', [...common, '--runs', '20']);
+  const out = run('target.mjs', [...common, '--genre', 'puzzle']);
+  assert.match(out, /game type: Puzzle/);
+  assert.match(out, /source: /);
+  assert.match(run('target.mjs', ['--list-genres']), /roguelike/);
+});

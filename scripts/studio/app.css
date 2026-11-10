@@ -128,3 +128,7 @@ dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:8px 0}
 .live .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .9s linear infinite;display:inline-block}
 
 @media (max-width:700px){nav{order:3;flex-basis:100%}.brand{flex:1}}
+
+ul.tight{margin:6px 0;padding-left:18px}ul.tight li{margin:3px 0;font-size:14px}.genre a{color:var(--accent)}
+
+.tgrid>*,.grid2>*,.grid3>*{min-width:0}select{max-width:100%;text-overflow:ellipsis}.genre,.panel{overflow-wrap:anywhere}

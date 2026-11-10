@@ -83,7 +83,7 @@ class Toy {
 export default {
   stages: Array.from({ length: 10 }, (_, i) => i + 1),
   // studio: defaults for the web app and the one number per stage that makes it harder (bigger = harder)
-  studio: { runs: 80, personas: ['random', 'novice', 'smart'] },
+  studio: { genre: 'general', runs: 80, personas: ['random', 'novice', 'smart'] },
   levers: { stage: { param: 'stageMul.{stage}', mode: 'mul', harder: 1, min: 0.4, max: 3, default: 1, unit: 'x' } },
   create({ stage, seed, emit, params }) { const g = Toy.init(stage, seed, params); g.emit = emit; return g; },
   // sensible human play: drink at low hp, otherwise kill the most dangerous enemy that dies fastest

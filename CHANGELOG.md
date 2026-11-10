@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.3.0
+- **Game type first**: `references/genres.json` (per-genre notes, suggested shape, honest confidence, sources), a game type picker in the studio, `target.mjs --genre/--list-genres`, adapter `studio.genre`, and SKILL.md rules: ask about the game, consult the file, research the web when unsure, write findings back, never present an unsourced number as a standard.
 - **Conversation mode**: work by talking with the agent instead of the web app. `detect.mjs` (scores), `target.mjs` (dry-run target proposal, `--write` to save), `calibrate.mjs`; SKILL.md tells the agent to explain, give its own opinion, and agree the target with the user. Same numbers and same run folder as the studio (`scripts/model.mjs`, `scripts/project.mjs`).
 - Studio: "Make the whole game harder or easier" is always visible (average slider, +/-5/10, where the change lands), "What happens next" and a one-click verify detection after calibration.
 - **Studio**: local web app (`scripts/studio.mjs`): Detect (average and per-stage difficulty, frustration, boredom, skill, confidence), Target (starts from the measured curve; average difficulty with a choice where the change lands; template curves; stage tags; drag to pin), Calibrate (`scripts/calibrate.mjs`, per-stage lever, fresh seed per round, verified on another seed), Runs and logs (console, attempt log, replay, settings, full report).

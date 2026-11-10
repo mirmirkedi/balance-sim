@@ -48,7 +48,7 @@ export const spreadWeights = (kind, n) => {
   const w = Array.from({ length: n }, (_, i) => { const t = n > 1 ? i / (n - 1) : 0; return kind === 'later' ? 0.15 + 1.7 * t : kind === 'earlier' ? 1.85 - 1.7 * t : kind === 'middle' ? 0.15 + 1.7 * Math.sin(Math.PI * t) : 1; });
   const m = mean(w); return w.map((x) => x / m);
 };
-export const defaultT = () => ({ spread: 'equal', snapshot: null, template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
+export const defaultT = () => ({ genre: null, spread: 'equal', snapshot: null, template: 'linear', start: 8, end: 55, average: null, wave: 18, area: 10, bossBump: 15, tolerance: 15, persona: 'smart', tags: {}, pins: {}, bosses: [] });
 
 // measured: array of difficulty (or null) per stage id, same order as ids. Gaps are filled with the previous value.
 export const fillGaps = (m) => { let last = m.find((x) => x != null) ?? 50; return m.map((x) => { if (x != null) last = x; return last; }); };

@@ -48,6 +48,8 @@ const baseline = (s) => { const v = lever.read ? lever.read(s) : undefined; retu
 const snap = (v) => lever.integer ? Math.round(v) : +v.toFixed(3);
 const clamp = (v) => Math.min(lever.max ?? Infinity, Math.max(lever.min ?? -Infinity, v));
 const vals = new Map(ids.map((s) => [s, baseline(s)]));
+// --base may hold lever values of an earlier candidate: continue FROM them (they are the starting point, not fixed extras)
+for (const s of ids) { const k = paramOf(s); if (k in base) { vals.set(s, +base[k]); delete base[k]; } }
 
 const run = (script, args) => execFileSync(process.execPath, [path.join(here, script), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28 });
 const paramsFrom = (vm) => {
