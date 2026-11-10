@@ -1,7 +1,9 @@
 # balance-sim
 
-Game-independent balance simulator, packaged as a Claude Code skill.
-Bots play every level thousands of times, every shot / kill / drop / purchase is logged, and the analyzer prints the difficulty curve against a target curve (win rate with 95% CI, time, deaths, income) with a verdict per stage.
+Game-independent balance simulator and studio, packaged as a Claude Code skill.
+Bots play every stage thousands of times and log every shot / kill / drop / purchase. You see how hard the game is, set how hard it should be (whole game, single stages, template curves), and let the studio calibrate towards it. Works for turn based, puzzle, real time, idle and campaign games.
+
+Requirements: Node 18+, no npm dependencies. The web app listens on 127.0.0.1 only and never edits your game files.
 
 ```
 stage   random novice  smart optimi  target  delta   95% CI  tries   time  death  income   flags
@@ -13,21 +15,20 @@ stage   random novice  smart optimi  target  delta   95% CI  tries   time  death
 ## What it does
 
 - **Studio (web app).** `node scripts/studio.mjs` in a game folder: detect the difficulty (average and per stage), pick a target curve (templates, average difficulty, stage tags), auto-calibrate the per-stage lever, browse run logs and replay attempts. See SKILL.md.
-
 - **Any mechanic.** Turn based, shot-budget puzzles, real time (`actionRepeat`), idle / auto battlers (`advance()`), and whole campaigns with an economy (`--campaign`: profile, rewards, shop, retries, quit points).
 - **Personas** `random`, `novice`, `smart`, `optimizer` (2-move lookahead) and `oracle` (the game's exact solver, for puzzles). The gaps between them show skill depth, mistake cost and weak policies.
 - **Verdicts** `TOO_EASY/HARD` (only when the whole 95% interval is outside the band), `SPIKE`, `WALL`, `NO_SKILL`, `BOT_LOST`, `COINFLIP`, `INCOME_LOW`, `SLOW`, `POLICY_GAP`, ...
 - **Sweep** one parameter over several values and pick the best (`sweep.mjs`).
 - **Agentic tuning** (`tune.mjs`): the agent proposes parameter sets, the script measures them (loss, remaining flags, per-stage deltas, history); the agent interprets and iterates.
 - **Replay** any single run as a timeline (`--replay smart:7:12`).
-- **Calibrate** bots against real playtest numbers (`--humans`).
+- **Check the bots against real players** with playtest numbers (`--humans`).
 - **Interactive HTML report** (`--html`): summary cards, "look here first", metric and persona toggles, hover tooltips, click a stage for a plain-words explanation with what to try, sortable and filterable table, flag glossary, dark mode. One self-contained file, no network.
 
 ## Quick start (the normal way: with Claude)
 
 You do not write any code. You talk to Claude Code in the game's folder:
 
-1. **Install once** (below), then say "balance layalım" or run `/balance-studio`.
+1. **Install once** (below), then say "balance this game" (or "balance layalım") or run `/balance-studio`.
 2. **Claude builds the connector first.** The studio needs a small adapter file in the game (`tools/balance/adapter.mjs`) that lets the bots play it: which actions exist, how a step works, who won. Claude reads your game and writes it (it reuses a headless engine or an existing bot if the game has one, otherwise it runs the real game code in a Node `vm`). It also declares the one number per stage that makes it harder or easier (`levers`), so calibration can work. Claude checks the adapter with a short run before going on.
 3. **Claude starts the studio** (`node ~/.claude/skills/balance-sim/scripts/studio.mjs`) and gives you the URL.
 4. **You use the four steps in the browser:**
@@ -44,16 +45,25 @@ Bots are not humans: the scores describe the bots. A real playtest of the change
 ```bash
 git clone https://github.com/mirmirkedi/balance-sim ~/code/balance-sim
 cd ~/code/balance-sim && ./install.sh     # symlinks the skill, /balance and /balance-studio into ~/.claude
-npm test                                   # 18 end-to-end tests
+npm test                                   # 19 end-to-end tests
 ```
 
-Then in Claude Code, in the game's folder: `/balance-studio` or just "balance layalım" (Claude asks whether to use this skill).
+Then in Claude Code, in the game's folder: `/balance-studio`, or just say "balance this game" / "balance layalım" (Claude asks whether to use this skill).
+
+## Try it in a minute (no game needed)
+
+```bash
+git clone https://github.com/mirmirkedi/balance-sim && cd balance-sim
+npm run studio          # opens the web app on a small demo game (nothing in your projects is touched)
+```
+
+Click **Run detection**, then **Target** (move the average difficulty up by 10), **Save and calibrate**, **Run calibration**. About two minutes, no dependencies besides Node 18+.
 
 ## Without Claude (you already have an adapter)
 
 ```bash
 cd <game folder>
-node ~/.claude/skills/balance-sim/scripts/studio.mjs                     # the web app
+node ~/.claude/skills/balance-sim/scripts/studio.mjs                     # the web app (or: node <clone>/scripts/studio.mjs)
 node ~/.claude/skills/balance-sim/scripts/studio.mjs --adapter path/to/adapter.mjs --targets path/to/targets.json --port 4173
 ```
 
@@ -84,14 +94,15 @@ Write an adapter for your own game from `templates/adapter.template.mjs`. Workfl
 | `scripts/tune.mjs` | evaluates multi-parameter candidates (agent chosen or scouted in agent ranges), keeps history |
 | `scripts/personas.mjs`, `lib.mjs`, `rng.mjs` | personas (+ `chooseItem` for shops), shared run loop, seeded RNG |
 | `templates/` | adapter and target-curve templates |
-| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr14-puzzle` (real egg-nest puzzle with its own headless engine and exact solver, `oracle` persona), `pr15-html-vm` (a real single-HTML game run headless in a Node vm; set `PR15_GAME=/path/to/game.html`) |
-| `commands/balance.md` | the `/balance` slash command |
+| `examples/` | `toy-wave` (turn based), `toy-budget` (shot-budget puzzle), `toy-autobattle` (idle, campaign), `pr14-puzzle` and `pr15-html-vm` (reference adapters of two real prototypes: one wraps a headless engine and an exact solver, the other runs a single-HTML game in a Node `vm`; they need those games to run). Start from `toy-wave` for a complete example with the studio levers. |
+| `commands/` | the `/balance` and `/balance-studio` slash commands |
+| `CHANGELOG.md` | what changed per version |
 | `test/` | end-to-end tests (`npm test`) |
 
 ## Status
 
 Tested on three toy mechanics and two real games:
-- **PR-15** (single-HTML idle RPG, headless via `vm`): tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md.
-- **PR-14** (egg-nest tile puzzle, headless engine + exact solver): baseline measured, all 100 levels proven solvable, bots lose from level 11 on; not tuned yet because the intended difficulty is undecided.
+- **PR-15** (internal prototype, single-HTML idle RPG, headless via `vm`): tuned from 22 to 9 points mean error against its target curve, see "Lessons from tuning PR-15" in SKILL.md.
+- **PR-14** (internal prototype, egg-nest tile puzzle, headless engine + exact solver): baseline measured, all 100 levels proven solvable, bots lose from level 11 on; not tuned yet because the intended difficulty is undecided.
 
 Known gaps: bots are not humans and are not calibrated to real players (use `--humans`); target curves in the examples are guesses; the `smart` policy of each game is simple; there is no LLM-played persona yet; a long run (3000+ runs with `optimizer`/`oracle`) takes tens of minutes. Real playtests override the report.

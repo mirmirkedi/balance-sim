@@ -9,3 +9,5 @@ node_modules/
 .vscode/
 .env
 *.html.bak
+.impeccable/
+.demo/

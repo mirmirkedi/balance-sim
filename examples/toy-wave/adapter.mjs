@@ -12,12 +12,13 @@ function rollAt(seed, n) {
 
 class Toy {
   constructor(stage, emit, s) { this.stage = stage; this.emit = emit; this.s = s; }
-  // P = tunables handed in by `--set key=value` (multipliers, default 1): enemyHp, enemyAtk, playerDmg
+  // P = tunables handed in by `--set key=value` (multipliers, default 1): enemyHp, enemyAtk, playerDmg,
+  // and stageMul.<stage> (enemy HP and damage of ONE stage: the per-stage lever the studio calibrates)
   static init(stage, seed, P = {}) {
     const hpMax = 100 + 10 * (stage - 1);
     const s = {
       seed, rolls: 0, hp: hpMax, hpMax, dmg: Math.round(12 * (1 + 0.12 * (stage - 1)) * (P.playerDmg ?? 1)), potions: 2,
-      eHp: P.enemyHp ?? 1, eAtk: P.enemyAtk ?? 1,
+      eHp: (P.enemyHp ?? 1) * (P['stageMul.' + stage] ?? 1), eAtk: (P.enemyAtk ?? 1) * (P['stageMul.' + stage] ?? 1),
       wave: 0, waves: 2 + Math.floor(stage / 4), enemies: [], t: 0, coins: 0, done: false, win: false,
     };
     const g = new Toy(stage, NOOP, s);
@@ -81,6 +82,9 @@ class Toy {
 
 export default {
   stages: Array.from({ length: 10 }, (_, i) => i + 1),
+  // studio: defaults for the web app and the one number per stage that makes it harder (bigger = harder)
+  studio: { runs: 80, personas: ['random', 'novice', 'smart'] },
+  levers: { stage: { param: 'stageMul.{stage}', mode: 'mul', harder: 1, min: 0.4, max: 3, default: 1, unit: 'x' } },
   create({ stage, seed, emit, params }) { const g = Toy.init(stage, seed, params); g.emit = emit; return g; },
   // sensible human play: drink at low hp, otherwise kill the most dangerous enemy that dies fastest
   policy(game, acts) {

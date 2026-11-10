@@ -166,7 +166,7 @@ function watchJob(id) {
   A.lines = []; $('#console').textContent = ''; $('#dtitle').textContent = 'Console: ' + id;
   const es = A.es = new EventSource('/api/jobs/' + id + '/stream');
   es.onmessage = (e) => { const l = JSON.parse(e.data); A.lines.push(l); const c = $('#console'); c.append(l + '\n'); c.scrollTop = c.scrollHeight; updateLive(); };
-  es.addEventListener('done', () => { es.close(); });
+  es.addEventListener('done', () => { es.close(); setTimeout(() => tick(), 300); });
 }
 function go(tab) { A.tab = tab; history.replaceState(null, '', '#' + tab); render(); }
 
@@ -219,7 +219,7 @@ async function startDetect(ev) {
     await afterStart(meta.id);
   } catch (e) { toast(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Run detection'; } }
 }
-async function afterStart(id) { await refresh(); watchJob(id); toggleConsole(true); render(); }
+async function afterStart(id) { A.jobWas = id; await refresh(); watchJob(id); toggleConsole(true); render(); }
 
 function detectResults(root, d) {
   const sc = d.scores, sm = d.sum, rep = d.report, ok = sc.filter((s) => !s.empty);
@@ -563,22 +563,23 @@ async function render() {
   try {
     if (A.tab === 'detect') { if (A.det === null) await loadDetect(); viewDetect(root); }
     else if (A.tab === 'target') { if (A.det === null) await loadDetect(); viewTarget(root); }
-    else if (A.tab === 'calibrate') { if (!A.calib) await loadCalib(); viewCalibrate(root); }
+    else if (A.tab === 'calibrate') { if (A.det === null) await loadDetect(); if (!A.calib) await loadCalib(); viewCalibrate(root); }
     else viewLogs(root);
   } catch (e) { root.append(h('div', { class: 'note bad' }, String(e.message || e))); }
 }
 // poll while a job runs; when it ends reload the data and redraw
 async function tick() {
   try {
-    const prev = A.st && A.st.job;
     await refresh();
-    const j = A.st.job;
-    if (j && j.status === 'running') {
+    const j = A.st.job, running = j && j.status === 'running';
+    if (running) {
       if (!A.es || A.jobWas !== j.id) { watchJob(j.id); A.jobWas = j.id; }
       if (A.tab === 'calibrate' && j.kind === 'calibrate') { A.calibRunId = j.id; A.calib = await api('/api/runs/' + j.id); render(); }
-    } else if (prev && prev.status === 'running' || (A.jobWas && !(j && j.status === 'running'))) {
+    } else if (A.jobWas) {   // a job we started (or watched) has ended, even if it was too fast for a poll to see it running
       const done = A.jobWas; A.jobWas = null;
-      if (done) { A.det = null; if (done.startsWith('calibrate')) { A.calib = null; A.calibRunId = done; } render(); }
+      A.det = null;
+      if (done.startsWith('calibrate')) { A.calib = null; A.calibRunId = done; }
+      render();
     }
     if (A.offline) { A.offline = false; $('#toast').hidden = true; }
   } catch (e) { if (!A.offline) { A.offline = true; toast('Lost the connection to the studio server. Is it still running? Start it again with: node ~/.claude/skills/balance-sim/scripts/studio.mjs', 'bad', true); } }

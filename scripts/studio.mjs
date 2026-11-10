@@ -21,8 +21,11 @@ const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };
 const has = (n) => argv.includes('--' + n);
 const projectDir = path.resolve(arg('dir', process.cwd()));
-const adapterPath = path.resolve(projectDir, arg('adapter', 'tools/balance/adapter.mjs'));
-const targetsPath = path.resolve(projectDir, arg('targets', 'tools/balance/targets.json'));
+// a relative path from the command line may be relative to where you typed it or to the game folder: use whichever exists
+const show = (p) => { const r = path.relative(projectDir, p); return r.startsWith('..') ? p : r; };
+const where = (v) => { const a = path.resolve(process.cwd(), v), b = path.resolve(projectDir, v); return path.isAbsolute(v) || fs.existsSync(a) ? a : b; };
+const adapterPath = where(arg('adapter', 'tools/balance/adapter.mjs'));
+const targetsPath = where(arg('targets', 'tools/balance/targets.json'));
 const port = +arg('port', 4173);
 const stateDir = path.join(projectDir, '.balance-sim'), runsDir = path.join(stateDir, 'runs'), cfgPath = path.join(stateDir, 'config.json');
 fs.mkdirSync(runsDir, { recursive: true });
@@ -33,7 +36,7 @@ const web = path.join(here, 'studio');
 let info = null, infoError = null;
 async function loadAdapter() {
   info = null; infoError = null;
-  if (!fs.existsSync(adapterPath)) { infoError = `No adapter at ${path.relative(projectDir, adapterPath)}. Ask Claude to write one for this game (balance-sim SKILL.md, step 2), or pass --adapter.`; return; }
+  if (!fs.existsSync(adapterPath)) { infoError = `No adapter at ${show(adapterPath)}. Ask Claude to write one for this game (balance-sim SKILL.md, step 2), or pass --adapter.`; return; }
   try {
     const a = (await import(pathToFileURL(adapterPath).href + '?t=' + Date.now())).default;
     const l = a.levers && a.levers.stage;
@@ -162,7 +165,7 @@ const server = http.createServer(async (req, res) => {
       const f = p === '/' ? 'app.html' : p.slice(1);
       return send(res, 200, fs.readFileSync(path.join(web, f)), MIME[path.extname(f)]);
     }
-    if (p === '/api/state') return send(res, 200, { project: path.basename(projectDir), dir: projectDir, adapter: path.relative(projectDir, adapterPath), targetsFile: path.relative(projectDir, targetsPath), info, infoError, config: config(), targets: targets(), runs: listRuns(), job: job ? { id: job.id, kind: job.kind, status: job.status } : null });
+    if (p === '/api/state') return send(res, 200, { project: path.basename(projectDir), dir: projectDir, adapter: show(adapterPath), targetsFile: show(targetsPath), info, infoError, config: config(), targets: targets(), runs: listRuns(), job: job ? { id: job.id, kind: job.kind, status: job.status } : null });
     if (p === '/api/reload' && req.method === 'POST') { await loadAdapter(); return send(res, 200, { ok: !infoError, error: infoError }); }
     if (p === '/api/config' && req.method === 'POST') { const b = await body(req); const c = { ...config(), ...b }; writeJson(cfgPath, c); return send(res, 200, c); }
     if (p === '/api/targets' && req.method === 'POST') {
@@ -200,6 +203,6 @@ await loadAdapter();
 server.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? `Port ${port} is busy. Use --port.` : e.message); process.exit(1); });
 server.listen(port, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${port}/`;
-  console.log(`balance-sim studio for ${path.basename(projectDir)}\n  ${url}\n  adapter: ${path.relative(projectDir, adapterPath)}${infoError ? '\n  ' + infoError : ` (${info.stages.length} stages${info.campaign ? ', campaign' : ''}${info.levers ? ', calibration levers' : ', no calibration levers'})`}\n  state:   ${path.relative(projectDir, stateDir)}/\nCtrl+C to stop.`);
+  console.log(`balance-sim studio for ${path.basename(projectDir)}\n  ${url}\n  adapter: ${show(adapterPath)}${infoError ? '\n  ' + infoError : ` (${info.stages.length} stages${info.campaign ? ', campaign' : ''}${info.levers ? ', calibration levers' : ', no calibration levers'})`}\n  state:   ${path.relative(projectDir, stateDir)}/\nCtrl+C to stop.`);
   if (!has('no-open')) exec(process.platform === 'darwin' ? `open "${url}"` : process.platform === 'win32' ? `start "" "${url}"` : `xdg-open "${url}"`, () => {});
 });
